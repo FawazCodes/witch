@@ -5,68 +5,66 @@
   <title>Mushroom Meme</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    html,body{
-      margin:0;
-      height:100%;
-      overflow:hidden; /* keep the canvas clean on phones */
-      background:#000;
-    }
-    /* Responsive image: keep it legible on phones & desktops */
+    html,body{margin:0;height:100%;overflow:hidden;background:#000;}
     #shroom{
       position:absolute;
-      width:40vmin; /* 40% of the smaller viewport edge */
+      width:40vmin; /* scales on phones and desktops */
       top:50%;
       left:50%;
       transform:translate(-50%,-50%) rotate(0deg);
-      pointer-events:none; /* ignore accidental taps */
+      pointer-events:none;
     }
+    audio{display:none;}
   </style>
 </head>
 <body>
   <img id="shroom" src="mushroom_meme.png" alt="Mushroom Meme">
+  <audio id="clownAudio" src="clown.mp3" autoplay loop playsinline></audio>
 
   <script>
     const img = document.getElementById('shroom');
+    const audio = document.getElementById('clownAudio');
+
+    // Starting position in the centre
+    const pos = { x: innerWidth / 2, y: innerHeight / 2 };
+    const vel = {
+      x: (Math.random() * 4 - 2) * (devicePixelRatio || 1),
+      y: (Math.random() * 4 - 2) * (devicePixelRatio || 1)
+    };
     let angle = 0;
 
-    // Initial position (center)
-    const pos = {
-      x: window.innerWidth  / 2,
-      y: window.innerHeight / 2
-    };
-
-    // Random velocity between -2 and 2 px per frame (scaled for high‑DPI phones)
-    const vel = {
-      x: (Math.random() * 4 - 2) * (window.devicePixelRatio || 1),
-      y: (Math.random() * 4 - 2) * (window.devicePixelRatio || 1)
-    };
-
     function update() {
-      // Spin
       angle = (angle + 2) % 360;
-
-      // Move
       pos.x += vel.x;
       pos.y += vel.y;
 
-      // Bounce from edges
-      if (pos.x < 0 || pos.x > window.innerWidth)  vel.x *= -1;
-      if (pos.y < 0 || pos.y > window.innerHeight) vel.y *= -1;
+      // Bounce off edges
+      if (pos.x < 0 || pos.x > innerWidth)  vel.x *= -1;
+      if (pos.y < 0 || pos.y > innerHeight) vel.y *= -1;
 
-      img.style.left = pos.x + "px";
-      img.style.top  = pos.y + "px";
+      img.style.left = pos.x + 'px';
+      img.style.top  = pos.y + 'px';
       img.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 
       requestAnimationFrame(update);
     }
 
-    // Keep centred after orientation / resize changes
-    window.addEventListener('resize', () => {
-      pos.x = Math.min(Math.max(pos.x, 0), window.innerWidth);
-      pos.y = Math.min(Math.max(pos.y, 0), window.innerHeight);
+    // Keep the image within bounds on resize or orientation change
+    addEventListener('resize', () => {
+      pos.x = Math.min(Math.max(pos.x, 0), innerWidth);
+      pos.y = Math.min(Math.max(pos.y, 0), innerHeight);
     });
 
-    update(); // kick‑off
+    // Try to start audio on first user gesture if the browser blocks autoplay
+    if (audio.paused) {
+      const resume = () => {
+        audio.play().catch(() => {});
+        removeEventListener('pointerdown', resume);
+      };
+      addEventListener('pointerdown', resume, { once: true });
+    }
+
+    update();
   </script>
 </body>
 </html>
