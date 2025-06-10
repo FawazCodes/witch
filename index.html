@@ -5,62 +5,68 @@
   <title>Mushroom Meme</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    /* Reset */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* Layout */
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: #111;
-      color: #eee;
-      font-family: system-ui, sans-serif;
+    html,body{
+      margin:0;
+      height:100%;
+      overflow:hidden; /* keep the canvas clean on phones */
+      background:#000;
     }
-
-    /* Image */
-    img {
-      width: 300px;
-      transition: transform 0.6s ease;
-    }
-    /* Flipped state */
-    .flipped {
-      transform: scaleX(-1);
-    }
-
-    /* Button */
-    button {
-      position: fixed;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 0.75rem 1.25rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      background: #ff914d;
-      color: #000;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #ffa866;
+    /* Responsive image: keep it legible on phones & desktops */
+    #shroom{
+      position:absolute;
+      width:40vmin; /* 40% of the smaller viewport edge */
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%) rotate(0deg);
+      pointer-events:none; /* ignore accidental taps */
     }
   </style>
 </head>
 <body>
-  <!-- Meme image -->
-  <img id="shroom" src="mushroom_meme.png" alt="Mushroom Meme Face">
-
-  <!-- Flip trigger -->
-  <button id="flipBtn">Flip</button>
+  <img id="shroom" src="mushroom_meme.png" alt="Mushroom Meme">
 
   <script>
     const img = document.getElementById('shroom');
-    const btn = document.getElementById('flipBtn');
+    let angle = 0;
 
-    // Toggle horizontal flip on each click
-    btn.addEventListener('click', () => img.classList.toggle('flipped'));
+    // Initial position (center)
+    const pos = {
+      x: window.innerWidth  / 2,
+      y: window.innerHeight / 2
+    };
+
+    // Random velocity between -2 and 2 px per frame (scaled for high‑DPI phones)
+    const vel = {
+      x: (Math.random() * 4 - 2) * (window.devicePixelRatio || 1),
+      y: (Math.random() * 4 - 2) * (window.devicePixelRatio || 1)
+    };
+
+    function update() {
+      // Spin
+      angle = (angle + 2) % 360;
+
+      // Move
+      pos.x += vel.x;
+      pos.y += vel.y;
+
+      // Bounce from edges
+      if (pos.x < 0 || pos.x > window.innerWidth)  vel.x *= -1;
+      if (pos.y < 0 || pos.y > window.innerHeight) vel.y *= -1;
+
+      img.style.left = pos.x + "px";
+      img.style.top  = pos.y + "px";
+      img.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+
+      requestAnimationFrame(update);
+    }
+
+    // Keep centred after orientation / resize changes
+    window.addEventListener('resize', () => {
+      pos.x = Math.min(Math.max(pos.x, 0), window.innerWidth);
+      pos.y = Math.min(Math.max(pos.y, 0), window.innerHeight);
+    });
+
+    update(); // kick‑off
   </script>
 </body>
 </html>
