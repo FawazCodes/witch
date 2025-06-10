@@ -1,163 +1,198 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>ULTIMATE Mushroom Meme</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    html,body{margin:0;height:100%;overflow:hidden;background:#000;}
-    /* Styles for individual mushrooms, applied dynamically */
-    .shroom-instance {
-      position:absolute;
-      pointer-events:none; /* IMPORTANT: Allows clicks to pass through to the body */
-      user-select: none; /* Prevent accidental text selection */
-      will-change: transform; /* Optimize animation performance */
-    }
-    audio{display:none;} /* Keep audio element hidden */
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meme Overload</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .meme {
+            position: absolute;
+            z-index: 5;
+            will-change: transform;
+        }
+
+        .emoji-text {
+            position: absolute;
+            font-size: 5rem;
+            font-family: "Comic Sans MS", "Comic Sans", cursive;
+            font-weight: bold;
+            color: white;
+            text-shadow: 3px 3px 0 #ff00de, -3px -3px 0 #00d9ff;
+            pointer-events: none;
+            z-index: 100;
+            animation: fade-out 1s forwards;
+            user-select: none;
+        }
+
+        @keyframes fade-out {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(1.5); }
+        }
+
+        .shake {
+            animation: screen-shake 0.15s linear;
+        }
+
+        @keyframes screen-shake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-10px, 10px); }
+            50% { transform: translate(10px, -10px); }
+            75% { transform: translate(-10px, 10px); }
+        }
+    </style>
 </head>
 <body>
-  <!-- The glorious clown music, loop it forever -->
-  <audio id="clownAudio" src="clown.mp3" autoplay loop playsinline></audio>
+    <audio id="memeAudio" src="clown.mp3" loop></audio>
 
-  <script>
-    const audio = document.getElementById('clownAudio');
-    const shrooms = []; // Array to hold all active mushroom instances
-    const mushroomImageSrc = 'mushroom_meme.png'; // Source for the mushroom image
+    <script>
+        const IMAGE_SRC = 'mushroom_meme.png';
+        const NUM_IMAGES_START = 15;
+        const MIN_SIZE = 50;
+        const MAX_SIZE = 200;
+        const EMOJIS = ["😝😝😝😝😝😝😝😝😝😝😝"];
 
-    // Class to manage each individual mushroom's properties and behavior
-    class Shroom {
-      constructor(x, y) {
-        // Create the image element
-        this.element = document.createElement('img');
-        this.element.src = mushroomImageSrc;
-        this.element.alt = 'Mushroom Meme';
-        this.element.className = 'shroom-instance';
-        document.body.appendChild(this.element); // Add to the DOM
+        const body = document.body;
+        const memes = [];
+        let chaosStarted = false;
 
-        // Randomize size (30vmin to 60vmin)
-        this.size = Math.random() * (60 - 30) + 30;
-        this.element.style.width = this.size + 'vmin';
-
-        // Set initial position
-        this.pos = { x: x, y: y };
-
-        // Randomize velocity with a higher range for more erratic movement
-        const speedMultiplier = (devicePixelRatio || 1) * (Math.random() * 3 + 1); // From 1x to 4x base speed
-        this.vel = {
-          x: (Math.random() * 2 - 1) * speedMultiplier, // -speed to +speed
-          y: (Math.random() * 2 - 1) * speedMultiplier
-        };
-
-        // Randomize rotation speed and starting angle
-        this.angle = Math.random() * 360;
-        this.rotationSpeed = Math.random() * 5 + 1; // Faster and varied rotation
-
-        // Randomize hue for a colorful, clownish look
-        this.hue = Math.random() * 360;
-        this.element.style.filter = `hue-rotate(${this.hue}deg)`;
-      }
-
-      // Update method for position and rotation
-      update() {
-        this.angle = (this.angle + this.rotationSpeed) % 360;
-        this.pos.x += this.vel.x;
-        this.pos.y += this.vel.y;
-
-        // Get actual size in pixels to calculate accurate collision bounds
-        // This accounts for `vmin` changing with window size
-        const shroomWidth = this.element.offsetWidth;
-        const shroomHeight = this.element.offsetHeight;
-
-        // Bounce off edges of the viewport
-        if (this.pos.x < shroomWidth / 2 || this.pos.x > innerWidth - shroomWidth / 2) {
-          this.vel.x *= -1;
-          // Nudge mushroom back into bounds to prevent sticking
-          this.pos.x = Math.max(shroomWidth / 2, Math.min(this.pos.x, innerWidth - shroomWidth / 2));
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
         }
-        if (this.pos.y < shroomHeight / 2 || this.pos.y > innerHeight - shroomHeight / 2) {
-          this.vel.y *= -1;
-          // Nudge mushroom back into bounds to prevent sticking
-          this.pos.y = Math.max(shroomHeight / 2, Math.min(this.pos.y, innerHeight - shroomHeight / 2));
+        
+        function createMeme(startX, startY) {
+            const size = random(MIN_SIZE, MAX_SIZE);
+            
+            const memeElement = document.createElement('img');
+            memeElement.src = IMAGE_SRC;
+            memeElement.alt = "Spinning Meme";
+            memeElement.className = 'meme';
+            memeElement.style.width = `${size}px`;
+            memeElement.style.height = `${size}px`;
+            
+            body.appendChild(memeElement);
+
+            const meme = {
+                element: memeElement,
+                x: startX || random(0, window.innerWidth - size),
+                y: startY || random(0, window.innerHeight - size),
+                dx: random(-4, 4) || 1,
+                dy: random(-4, 4) || 1,
+                rotation: 0,
+                rotationSpeed: random(-8, 8),
+                size: size
+            };
+
+            memes.push(meme);
         }
 
-        // Apply styles
-        this.element.style.left = this.pos.x + 'px';
-        this.element.style.top  = this.pos.y + 'px';
-        this.element.style.transform = `translate(-50%, -50%) rotate(${this.angle}deg)`;
-      }
+        function createMemeBurst(x, y) {
+            const burstAmount = 5;
+            for (let i = 0; i < burstAmount; i++) {
+                createMeme(x, y);
+            }
+        }
 
-      // Reposition on window resize to ensure mushrooms stay within the new bounds
-      repositionOnResize() {
-        const shroomWidth = this.element.offsetWidth;
-        const shroomHeight = this.element.offsetHeight;
-        this.pos.x = Math.min(Math.max(this.pos.x, shroomWidth / 2), innerWidth - shroomWidth / 2);
-        this.pos.y = Math.min(Math.max(this.pos.y, shroomHeight / 2), innerHeight - shroomHeight / 2);
-      }
-    }
+        function createEmojiText(x, y) {
+            const textElement = document.createElement('div');
+            textElement.className = 'emoji-text';
+            textElement.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+            textElement.style.left = `${x}px`;
+            textElement.style.top = `${y}px`;
+            textElement.style.transform = `translate(-50%, -50%) rotate(${random(-25, 25)}deg)`;
+            
+            body.appendChild(textElement);
+            
+            setTimeout(() => {
+                if(textElement.parentElement) {
+                    body.removeChild(textElement);
+                }
+            }, 1000);
+        }
 
-    // Function to create and add a new mushroom
-    function createShroom(x, y) {
-      const newShroom = new Shroom(x, y);
-      shrooms.push(newShroom);
-    }
+        function shakeScreen() {
+            body.classList.add('shake');
+            setTimeout(() => body.classList.remove('shake'), 150);
+        }
 
-    // The main animation loop
-    function animate() {
-      shrooms.forEach(shroom => shroom.update()); // Update all mushrooms
-      requestAnimationFrame(animate); // Request next frame
-    }
+        function induceMoreChaos(event) {
+            const x = event.touches ? event.touches[0].clientX : event.clientX;
+            const y = event.touches ? event.touches[0].clientY : event.clientY;
+            
+            createMemeBurst(x, y);
+            createEmojiText(x, y);
+            shakeScreen();
+        }
 
-    // --- Initial Setup ---
+        function animate() {
+            memes.forEach(meme => {
+                meme.x += meme.dx;
+                meme.y += meme.dy;
+                meme.rotation += meme.rotationSpeed;
 
-    // Spawn a few mushrooms right away for instant chaos
-    for (let i = 0; i < 5; i++) {
-      createShroom(innerWidth / 2, innerHeight / 2); // Start them from the center
-    }
+                if (meme.x <= 0 || meme.x + meme.size >= window.innerWidth) {
+                    meme.dx *= -1;
+                }
+                if (meme.y <= 0 || meme.y + meme.size >= window.innerHeight) {
+                    meme.dy *= -1;
+                }
+                
+                meme.element.style.transform = `translate(${meme.x}px, ${meme.y}px) rotate(${meme.rotation}deg)`;
+            });
 
-    // Adjust mushroom positions when the window is resized (e.g., orientation change on mobile)
-    addEventListener('resize', () => {
-      shrooms.forEach(shroom => shroom.repositionOnResize());
-    });
+            const r = Math.floor(random(0, 256));
+            const g = Math.floor(random(0, 256));
+            const b = Math.floor(random(0, 256));
+            body.style.backgroundColor = `rgb(${r},${g},${b})`;
 
-    // --- Audio Autoplay Handling (for browsers that block autoplay) ---
-    let audioPlayedSuccessfully = false;
-    const tryPlayAudio = () => {
-      if (!audioPlayedSuccessfully) { // Only try if not already playing
-        audio.play()
-          .then(() => {
-            audioPlayedSuccessfully = true; // Mark as played
-            console.log("Audio started successfully!");
-            // Optionally, remove these listeners if you only want the *first* interaction to trigger audio
-            document.removeEventListener('pointerdown', tryPlayAudio);
-            document.removeEventListener('keydown', tryPlayAudio);
-          })
-          .catch(error => {
-            console.warn("Autoplay prevented:", error);
-            // Audio didn't play, 'audioPlayedSuccessfully' remains false, so it will try again on next interaction
-          });
-      }
-    };
+            requestAnimationFrame(animate);
+        }
 
-    // If audio is initially paused (common for autoplay policies)
-    if (audio.paused) {
-      // Add listeners to attempt playback on any user interaction (click/tap or key press)
-      document.addEventListener('pointerdown', tryPlayAudio, { once: true });
-      document.addEventListener('keydown', tryPlayAudio, { once: true });
-    } else {
-      audioPlayedSuccessfully = true; // Audio is already playing (e.g., in a development environment)
-    }
+        async function startChaos() {
+            if (chaosStarted) return;
+            chaosStarted = true;
+            
+            const audio = document.getElementById('memeAudio');
+            if (audio.paused) {
+                audio.play().catch(error => {
+                    console.error("Audio playback failed:", error);
+                });
+            }
 
-    // --- Interactive Mushroom Spawning ---
-    // Spawn a new mushroom at the click/tap location
-    // Since mushrooms have `pointer-events: none`, this listener on `document.body`
-    // will always catch clicks, even if they visually land on a mushroom.
-    document.body.addEventListener('pointerdown', (e) => {
-      createShroom(e.clientX, e.clientY);
-    });
+            for (let i = 0; i < NUM_IMAGES_START; i++) {
+                createMeme();
+            }
 
-    // Start the endless animation loop!
-    animate();
-  </script>
+            animate();
+            
+            body.removeEventListener('click', startChaos);
+            body.addEventListener('click', induceMoreChaos);
+        }
+
+        body.addEventListener('click', startChaos, { once: true });
+
+        window.addEventListener('resize', () => {
+            memes.forEach(meme => {
+                if (meme.x + meme.size > window.innerWidth) {
+                    meme.x = window.innerWidth - meme.size;
+                }
+                 if (meme.y + meme.size > window.innerHeight) {
+                    meme.y = window.innerHeight - meme.size;
+                }
+            });
+        });
+
+    </script>
+
 </body>
 </html>
