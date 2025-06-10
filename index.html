@@ -2,69 +2,162 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Mushroom Meme</title>
+  <title>ULTIMATE Mushroom Meme</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     html,body{margin:0;height:100%;overflow:hidden;background:#000;}
-    #shroom{
+    /* Styles for individual mushrooms, applied dynamically */
+    .shroom-instance {
       position:absolute;
-      width:40vmin; /* scales on phones and desktops */
-      top:50%;
-      left:50%;
-      transform:translate(-50%,-50%) rotate(0deg);
-      pointer-events:none;
+      pointer-events:none; /* IMPORTANT: Allows clicks to pass through to the body */
+      user-select: none; /* Prevent accidental text selection */
+      will-change: transform; /* Optimize animation performance */
     }
-    audio{display:none;}
+    audio{display:none;} /* Keep audio element hidden */
   </style>
 </head>
 <body>
-  <img id="shroom" src="mushroom_meme.png" alt="Mushroom Meme">
+  <!-- The glorious clown music, loop it forever -->
   <audio id="clownAudio" src="clown.mp3" autoplay loop playsinline></audio>
 
   <script>
-    const img = document.getElementById('shroom');
     const audio = document.getElementById('clownAudio');
+    const shrooms = []; // Array to hold all active mushroom instances
+    const mushroomImageSrc = 'mushroom_meme.png'; // Source for the mushroom image
 
-    // Starting position in the centre
-    const pos = { x: innerWidth / 2, y: innerHeight / 2 };
-    const vel = {
-      x: (Math.random() * 4 - 2) * (devicePixelRatio || 1),
-      y: (Math.random() * 4 - 2) * (devicePixelRatio || 1)
-    };
-    let angle = 0;
+    // Class to manage each individual mushroom's properties and behavior
+    class Shroom {
+      constructor(x, y) {
+        // Create the image element
+        this.element = document.createElement('img');
+        this.element.src = mushroomImageSrc;
+        this.element.alt = 'Mushroom Meme';
+        this.element.className = 'shroom-instance';
+        document.body.appendChild(this.element); // Add to the DOM
 
-    function update() {
-      angle = (angle + 2) % 360;
-      pos.x += vel.x;
-      pos.y += vel.y;
+        // Randomize size (30vmin to 60vmin)
+        this.size = Math.random() * (60 - 30) + 30;
+        this.element.style.width = this.size + 'vmin';
 
-      // Bounce off edges
-      if (pos.x < 0 || pos.x > innerWidth)  vel.x *= -1;
-      if (pos.y < 0 || pos.y > innerHeight) vel.y *= -1;
+        // Set initial position
+        this.pos = { x: x, y: y };
 
-      img.style.left = pos.x + 'px';
-      img.style.top  = pos.y + 'px';
-      img.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+        // Randomize velocity with a higher range for more erratic movement
+        const speedMultiplier = (devicePixelRatio || 1) * (Math.random() * 3 + 1); // From 1x to 4x base speed
+        this.vel = {
+          x: (Math.random() * 2 - 1) * speedMultiplier, // -speed to +speed
+          y: (Math.random() * 2 - 1) * speedMultiplier
+        };
 
-      requestAnimationFrame(update);
+        // Randomize rotation speed and starting angle
+        this.angle = Math.random() * 360;
+        this.rotationSpeed = Math.random() * 5 + 1; // Faster and varied rotation
+
+        // Randomize hue for a colorful, clownish look
+        this.hue = Math.random() * 360;
+        this.element.style.filter = `hue-rotate(${this.hue}deg)`;
+      }
+
+      // Update method for position and rotation
+      update() {
+        this.angle = (this.angle + this.rotationSpeed) % 360;
+        this.pos.x += this.vel.x;
+        this.pos.y += this.vel.y;
+
+        // Get actual size in pixels to calculate accurate collision bounds
+        // This accounts for `vmin` changing with window size
+        const shroomWidth = this.element.offsetWidth;
+        const shroomHeight = this.element.offsetHeight;
+
+        // Bounce off edges of the viewport
+        if (this.pos.x < shroomWidth / 2 || this.pos.x > innerWidth - shroomWidth / 2) {
+          this.vel.x *= -1;
+          // Nudge mushroom back into bounds to prevent sticking
+          this.pos.x = Math.max(shroomWidth / 2, Math.min(this.pos.x, innerWidth - shroomWidth / 2));
+        }
+        if (this.pos.y < shroomHeight / 2 || this.pos.y > innerHeight - shroomHeight / 2) {
+          this.vel.y *= -1;
+          // Nudge mushroom back into bounds to prevent sticking
+          this.pos.y = Math.max(shroomHeight / 2, Math.min(this.pos.y, innerHeight - shroomHeight / 2));
+        }
+
+        // Apply styles
+        this.element.style.left = this.pos.x + 'px';
+        this.element.style.top  = this.pos.y + 'px';
+        this.element.style.transform = `translate(-50%, -50%) rotate(${this.angle}deg)`;
+      }
+
+      // Reposition on window resize to ensure mushrooms stay within the new bounds
+      repositionOnResize() {
+        const shroomWidth = this.element.offsetWidth;
+        const shroomHeight = this.element.offsetHeight;
+        this.pos.x = Math.min(Math.max(this.pos.x, shroomWidth / 2), innerWidth - shroomWidth / 2);
+        this.pos.y = Math.min(Math.max(this.pos.y, shroomHeight / 2), innerHeight - shroomHeight / 2);
+      }
     }
 
-    // Keep the image within bounds on resize or orientation change
+    // Function to create and add a new mushroom
+    function createShroom(x, y) {
+      const newShroom = new Shroom(x, y);
+      shrooms.push(newShroom);
+    }
+
+    // The main animation loop
+    function animate() {
+      shrooms.forEach(shroom => shroom.update()); // Update all mushrooms
+      requestAnimationFrame(animate); // Request next frame
+    }
+
+    // --- Initial Setup ---
+
+    // Spawn a few mushrooms right away for instant chaos
+    for (let i = 0; i < 5; i++) {
+      createShroom(innerWidth / 2, innerHeight / 2); // Start them from the center
+    }
+
+    // Adjust mushroom positions when the window is resized (e.g., orientation change on mobile)
     addEventListener('resize', () => {
-      pos.x = Math.min(Math.max(pos.x, 0), innerWidth);
-      pos.y = Math.min(Math.max(pos.y, 0), innerHeight);
+      shrooms.forEach(shroom => shroom.repositionOnResize());
     });
 
-    // Try to start audio on first user gesture if the browser blocks autoplay
+    // --- Audio Autoplay Handling (for browsers that block autoplay) ---
+    let audioPlayedSuccessfully = false;
+    const tryPlayAudio = () => {
+      if (!audioPlayedSuccessfully) { // Only try if not already playing
+        audio.play()
+          .then(() => {
+            audioPlayedSuccessfully = true; // Mark as played
+            console.log("Audio started successfully!");
+            // Optionally, remove these listeners if you only want the *first* interaction to trigger audio
+            document.removeEventListener('pointerdown', tryPlayAudio);
+            document.removeEventListener('keydown', tryPlayAudio);
+          })
+          .catch(error => {
+            console.warn("Autoplay prevented:", error);
+            // Audio didn't play, 'audioPlayedSuccessfully' remains false, so it will try again on next interaction
+          });
+      }
+    };
+
+    // If audio is initially paused (common for autoplay policies)
     if (audio.paused) {
-      const resume = () => {
-        audio.play().catch(() => {});
-        removeEventListener('pointerdown', resume);
-      };
-      addEventListener('pointerdown', resume, { once: true });
+      // Add listeners to attempt playback on any user interaction (click/tap or key press)
+      document.addEventListener('pointerdown', tryPlayAudio, { once: true });
+      document.addEventListener('keydown', tryPlayAudio, { once: true });
+    } else {
+      audioPlayedSuccessfully = true; // Audio is already playing (e.g., in a development environment)
     }
 
-    update();
+    // --- Interactive Mushroom Spawning ---
+    // Spawn a new mushroom at the click/tap location
+    // Since mushrooms have `pointer-events: none`, this listener on `document.body`
+    // will always catch clicks, even if they visually land on a mushroom.
+    document.body.addEventListener('pointerdown', (e) => {
+      createShroom(e.clientX, e.clientY);
+    });
+
+    // Start the endless animation loop!
+    animate();
   </script>
 </body>
 </html>
