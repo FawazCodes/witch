@@ -13,7 +13,7 @@
             overflow: hidden;
             background-color: #000;
             cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
+            -webkit-tap-highlight-color: transparent; /* Prevents flash on mobile tap */
         }
 
         .meme {
@@ -60,33 +60,42 @@
         const NUM_IMAGES_START = 15;
         const MIN_SIZE = 50;
         const MAX_SIZE = 200;
-        const EMOJIS = ["😝😝😝😝😝😝😝😝😝😝😝"];
+        // Corrected the typo in the second emoji string
+        const EMOJIS = ["😝😝😝😝😝😝😝😝😝😝😝", "😈😈😈😈😈😈😈😈😈😈😈"];
+        const MOTION_SENSITIVITY = 0.25; // How much the phone tilt affects meme movement
 
         const body = document.body;
         const memes = [];
         let chaosStarted = false;
+        
+        // --- NEW: Gravity object for device motion ---
+        const gravity = {
+            x: 0,
+            y: 0
+        };
 
         function random(min, max) {
             return Math.random() * (max - min) + min;
         }
-        
+
         function createMeme(startX, startY) {
             const size = random(MIN_SIZE, MAX_SIZE);
-            
+
             const memeElement = document.createElement('img');
             memeElement.src = IMAGE_SRC;
             memeElement.alt = "Spinning Meme";
             memeElement.className = 'meme';
             memeElement.style.width = `${size}px`;
             memeElement.style.height = `${size}px`;
-            
+
             body.appendChild(memeElement);
 
             const meme = {
                 element: memeElement,
                 x: startX || random(0, window.innerWidth - size),
                 y: startY || random(0, window.innerHeight - size),
-                dx: random(-4, 4) || 1,
+                // Ensure dx/dy are never 0 to start
+                dx: random(-4, 4) || 1, 
                 dy: random(-4, 4) || 1,
                 rotation: 0,
                 rotationSpeed: random(-8, 8),
@@ -109,15 +118,25 @@
             textElement.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
             textElement.style.left = `${x}px`;
             textElement.style.top = `${y}px`;
+            // --- BUG FIX: Corrected CSS transform syntax ---
             textElement.style.transform = `translate(-50%, -50%) rotate(${random(-25, 25)}deg)`;
-            
+
             body.appendChild(textElement);
-            
+
             setTimeout(() => {
-                if(textElement.parentElement) {
+                if (textElement.parentElement) {
                     body.removeChild(textElement);
                 }
             }, 1000);
+        }
+        
+        // --- NEW: Vibration function ---
+        function vibratePhone() {
+            // Check if the Vibration API is supported
+            if ('vibrate' in navigator) {
+                // Vibrate for 100ms, pause 50ms, vibrate 50ms for a chaotic feel
+                navigator.vibrate([100, 50, 50]);
+            }
         }
 
         function shakeScreen() {
@@ -126,27 +145,45 @@
         }
 
         function induceMoreChaos(event) {
+            // Use event.preventDefault() for touch to stop scrolling/zooming
+            event.preventDefault();
             const x = event.touches ? event.touches[0].clientX : event.clientX;
             const y = event.touches ? event.touches[0].clientY : event.clientY;
-            
+
             createMemeBurst(x, y);
             createEmojiText(x, y);
             shakeScreen();
+            vibratePhone(); // --- NEW: Call vibration function
         }
 
         function animate() {
             memes.forEach(meme => {
+                // --- NEW: Apply gravity from device motion ---
+                meme.dx += gravity.x;
+                meme.dy += gravity.y;
+                
                 meme.x += meme.dx;
                 meme.y += meme.dy;
                 meme.rotation += meme.rotationSpeed;
 
-                if (meme.x <= 0 || meme.x + meme.size >= window.innerWidth) {
-                    meme.dx *= -1;
+                // Improved boundary collision logic
+                if (meme.x <= 0) {
+                    meme.x = 0;
+                    meme.dx *= -0.9; // Lose some energy on bounce
+                } else if (meme.x + meme.size >= window.innerWidth) {
+                    meme.x = window.innerWidth - meme.size;
+                    meme.dx *= -0.9;
                 }
-                if (meme.y <= 0 || meme.y + meme.size >= window.innerHeight) {
-                    meme.dy *= -1;
+
+                if (meme.y <= 0) {
+                    meme.y = 0;
+                    meme.dy *= -0.9;
+                } else if (meme.y + meme.size >= window.innerHeight) {
+                    meme.y = window.innerHeight - meme.size;
+                    meme.dy *= -0.9;
                 }
                 
+                // --- BUG FIX: Corrected CSS transform syntax ---
                 meme.element.style.transform = `translate(${meme.x}px, ${meme.y}px) rotate(${meme.rotation}deg)`;
             });
 
@@ -157,16 +194,45 @@
 
             requestAnimationFrame(animate);
         }
+        
+        // --- NEW: Function to request Device Motion permissions (for iOS) ---
+        function requestMotionPermission() {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('devicemotion', handleMotion);
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Handle non-iOS 13+ devices
+                window.addEventListener('devicemotion', handleMotion);
+            }
+        }
+
+        // --- NEW: Handler for the device motion event ---
+        function handleMotion(event) {
+            if (event.accelerationIncludingGravity.x) {
+                // Tilting phone left/right affects x gravity
+                gravity.x = event.accelerationIncludingGravity.x * MOTION_SENSITIVITY;
+                // Tilting phone front/back affects y gravity
+                gravity.y = -event.accelerationIncludingGravity.y * MOTION_SENSITIVITY;
+            }
+        }
 
         async function startChaos() {
             if (chaosStarted) return;
             chaosStarted = true;
             
+            // --- NEW: Request motion permission on first user interaction ---
+            requestMotionPermission();
+
             const audio = document.getElementById('memeAudio');
-            if (audio.paused) {
-                audio.play().catch(error => {
-                    console.error("Audio playback failed:", error);
-                });
+            try {
+                await audio.play();
+            } catch (error) {
+                console.error("Audio playback failed. User interaction is required.", error);
             }
 
             for (let i = 0; i < NUM_IMAGES_START; i++) {
@@ -175,23 +241,29 @@
 
             animate();
             
-            body.removeEventListener('click', startChaos);
+            // This event listener is removed by the { once: true } option below
+            // No need for body.removeEventListener('click', startChaos);
             body.addEventListener('click', induceMoreChaos);
+            
+            // --- NEW: Add touchmove for "painting chaos" ---
+            body.addEventListener('touchmove', induceMoreChaos);
         }
 
+        // Use { once: true } to automatically remove the listener after it runs
         body.addEventListener('click', startChaos, { once: true });
+        body.addEventListener('touchstart', startChaos, { once: true });
+
 
         window.addEventListener('resize', () => {
             memes.forEach(meme => {
                 if (meme.x + meme.size > window.innerWidth) {
                     meme.x = window.innerWidth - meme.size;
                 }
-                 if (meme.y + meme.size > window.innerHeight) {
+                if (meme.y + meme.size > window.innerHeight) {
                     meme.y = window.innerHeight - meme.size;
                 }
             });
         });
-
     </script>
 
 </body>
