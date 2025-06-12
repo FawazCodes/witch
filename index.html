@@ -3,196 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meme Overload</title>
+    <title>Improved Dislike Animation</title>
     <style>
-        html, body {
+        /* Basic setup for a full-screen, dark canvas */
+        body {
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
+            overflow: hidden; /* Hide scrollbars */
+            background-color: #111;
+            color: #fff; /* Just in case any text appears */
         }
 
-        .meme {
+        /* Style for each individual emoji */
+        .thumb {
             position: absolute;
-            z-index: 5;
-            will-change: transform;
-        }
-
-        .emoji-text {
-            position: absolute;
-            font-size: 5rem;
-            font-family: "Comic Sans MS", "Comic Sans", cursive;
-            font-weight: bold;
-            color: white;
-            text-shadow: 3px 3px 0 #ff00de, -3px -3px 0 #00d9ff;
-            pointer-events: none;
-            z-index: 100;
-            animation: fade-out 1s forwards;
+            /* Start off-screen at the top */
+            top: -100px; 
+            
+            /* Disable user selection */
             user-select: none;
+            -webkit-user-select: none;
+
+            /* Set the animation */
+            animation-name: fall;
+            animation-timing-function: linear; /* A constant speed feels more natural for falling */
+            animation-iteration-count: 1; /* Animation plays once */
+            animation-fill-mode: forwards; /* Element stays at the final state of the animation */
         }
 
-        @keyframes fade-out {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(1.5); }
-        }
-
-        .shake {
-            animation: screen-shake 0.15s linear;
-        }
-
-        @keyframes screen-shake {
-            0%, 100% { transform: translate(0, 0); }
-            25% { transform: translate(-10px, 10px); }
-            50% { transform: translate(10px, -10px); }
-            75% { transform: translate(-10px, 10px); }
+        /* The keyframe animation for falling */
+        @keyframes fall {
+            from {
+                /* The emoji starts above the screen and is fully visible */
+                transform: translateY(0) rotate(0);
+                opacity: 1;
+            }
+            to {
+                /* The emoji falls to just below the screen and fades out */
+                transform: translateY(110vh) rotate(360deg);
+                opacity: 0;
+            }
         }
     </style>
 </head>
 <body>
-    <audio id="memeAudio" src="clown.mp3" loop></audio>
-
     <script>
-        const IMAGE_SRC = 'mushroom_meme.png';
-        const NUM_IMAGES_START = 15;
-        const MIN_SIZE = 50;
-        const MAX_SIZE = 200;
-        const EMOJIS = ["😝😝😝😝😝😝😝😝😝😝😝"];
-
-        const body = document.body;
-        const memes = [];
-        let chaosStarted = false;
-
-        function random(min, max) {
-            return Math.random() * (max - min) + min;
-        }
-        
-        function createMeme(startX, startY) {
-            const size = random(MIN_SIZE, MAX_SIZE);
+        // Wait until the HTML document is fully loaded and parsed
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
             
-            const memeElement = document.createElement('img');
-            memeElement.src = IMAGE_SRC;
-            memeElement.alt = "Spinning Meme";
-            memeElement.className = 'meme';
-            memeElement.style.width = `${size}px`;
-            memeElement.style.height = `${size}px`;
-            
-            body.appendChild(memeElement);
+            // --- Configuration ---
+            const EMOJI = '👎🏿'; // Change the emoji here. You can use '👎', '👎🏻', '👎🏽', etc.
+            const EMOJIS_PER_SECOND = 15; // How many new emojis to create per second
 
-            const meme = {
-                element: memeElement,
-                x: startX || random(0, window.innerWidth - size),
-                y: startY || random(0, window.innerHeight - size),
-                dx: random(-4, 4) || 1,
-                dy: random(-4, 4) || 1,
-                rotation: 0,
-                rotationSpeed: random(-8, 8),
-                size: size
-            };
+            function createThumb() {
+                const thumbElement = document.createElement('div');
+                thumbElement.classList.add('thumb');
+                thumbElement.textContent = EMOJI;
 
-            memes.push(meme);
-        }
+                // --- Randomize Visuals for a More Dynamic Effect ---
 
-        function createMemeBurst(x, y) {
-            const burstAmount = 5;
-            for (let i = 0; i < burstAmount; i++) {
-                createMeme(x, y);
-            }
-        }
+                // 1. Random horizontal starting position (from 0% to 100% of the screen width)
+                thumbElement.style.left = `${Math.random() * 100}vw`;
 
-        function createEmojiText(x, y) {
-            const textElement = document.createElement('div');
-            textElement.className = 'emoji-text';
-            textElement.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-            textElement.style.left = `${x}px`;
-            textElement.style.top = `${y}px`;
-            textElement.style.transform = `translate(-50%, -50%) rotate(${random(-25, 25)}deg)`;
-            
-            body.appendChild(textElement);
-            
-            setTimeout(() => {
-                if(textElement.parentElement) {
-                    body.removeChild(textElement);
-                }
-            }, 1000);
-        }
+                // 2. Random size (from 24px to 64px)
+                const randomSize = Math.random() * 40 + 24;
+                thumbElement.style.fontSize = `${randomSize}px`;
 
-        function shakeScreen() {
-            body.classList.add('shake');
-            setTimeout(() => body.classList.remove('shake'), 150);
-        }
-
-        function induceMoreChaos(event) {
-            const x = event.touches ? event.touches[0].clientX : event.clientX;
-            const y = event.touches ? event.touches[0].clientY : event.clientY;
-            
-            createMemeBurst(x, y);
-            createEmojiText(x, y);
-            shakeScreen();
-        }
-
-        function animate() {
-            memes.forEach(meme => {
-                meme.x += meme.dx;
-                meme.y += meme.dy;
-                meme.rotation += meme.rotationSpeed;
-
-                if (meme.x <= 0 || meme.x + meme.size >= window.innerWidth) {
-                    meme.dx *= -1;
-                }
-                if (meme.y <= 0 || meme.y + meme.size >= window.innerHeight) {
-                    meme.dy *= -1;
-                }
+                // 3. Random animation duration (from 3 to 8 seconds)
+                const randomDuration = Math.random() * 5 + 3;
+                thumbElement.style.animationDuration = `${randomDuration}s`;
                 
-                meme.element.style.transform = `translate(${meme.x}px, ${meme.y}px) rotate(${meme.rotation}deg)`;
-            });
+                // 4. Random animation delay (from 0 to 1 second)
+                // This spreads out their start times even more
+                const randomDelay = Math.random() * 1;
+                thumbElement.style.animationDelay = `${randomDelay}s`;
 
-            const r = Math.floor(random(0, 256));
-            const g = Math.floor(random(0, 256));
-            const b = Math.floor(random(0, 256));
-            body.style.backgroundColor = `rgb(${r},${g},${b})`;
+                // 5. Random starting rotation for a bit of tumble
+                thumbElement.style.transform = `rotate(${Math.random() * 90 - 45}deg)`;
 
-            requestAnimationFrame(animate);
-        }
+                // Add the new emoji to the page
+                body.appendChild(thumbElement);
 
-        async function startChaos() {
-            if (chaosStarted) return;
-            chaosStarted = true;
-            
-            const audio = document.getElementById('memeAudio');
-            if (audio.paused) {
-                audio.play().catch(error => {
-                    console.error("Audio playback failed:", error);
+                // --- Performance: Clean up by removing the element after it animates ---
+                // The 'animationend' event fires when the CSS animation is complete.
+                thumbElement.addEventListener('animationend', () => {
+                    thumbElement.remove(); // This is crucial for performance!
                 });
             }
-
-            for (let i = 0; i < NUM_IMAGES_START; i++) {
-                createMeme();
-            }
-
-            animate();
             
-            body.removeEventListener('click', startChaos);
-            body.addEventListener('click', induceMoreChaos);
-        }
-
-        body.addEventListener('click', startChaos, { once: true });
-
-        window.addEventListener('resize', () => {
-            memes.forEach(meme => {
-                if (meme.x + meme.size > window.innerWidth) {
-                    meme.x = window.innerWidth - meme.size;
-                }
-                 if (meme.y + meme.size > window.innerHeight) {
-                    meme.y = window.innerHeight - meme.size;
-                }
-            });
+            // --- Run the Animation ---
+            // Use setInterval to create new emojis at a regular rate for a continuous effect.
+            // 1000ms / EMOJIS_PER_SECOND gives us the interval time.
+            setInterval(createThumb, 1000 / EMOJIS_PER_SECOND);
         });
-
     </script>
-
 </body>
 </html>
