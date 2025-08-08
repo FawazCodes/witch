@@ -1,101 +1,278 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Improved Dislike Animation</title>
-    <style>
-        /* Basic setup for a full-screen, dark canvas */
-        body {
-            margin: 0;
-            overflow: hidden; /* Hide scrollbars */
-            background-color: #111;
-            color: #fff; /* Just in case any text appears */
-        }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Surprise</title>
+  <style>
+    :root{
+      --bg:#0b0d12; --fg:#e5e7eb; --muted:#94a3b8;
+      --a:#7c3aed; --b:#10b981; --c:#f59e0b; --d:#06b6d4; --e:#e11d48; --f:#a3e635;
+    }
+    @media (prefers-color-scheme: light){ :root{ --bg:#f6f7fb; --fg:#0b0d12; --muted:#475569; } }
+    *{ box-sizing:border-box }
+    html,body{ margin:0; height:100% }
+    body{
+      background: radial-gradient(1200px 800px at 70% -10%, rgba(124,58,237,.16), transparent 60%),
+                  radial-gradient(1000px 600px at 10% 110%, rgba(16,185,129,.13), transparent 60%),
+                  var(--bg);
+      color:var(--fg);
+      font:16px/1.5 ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple Color Emoji, Segoe UI Emoji, sans-serif;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      touch-action:manipulation; user-select:none;
+    }
+    .wrap{ height:100%; display:grid; place-items:center; padding:24px }
+    .start{
+      position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:18px 28px; font-weight:900; font-size:20px; border-radius:999px; cursor:pointer;
+      background:linear-gradient(135deg,var(--a),var(--b)); color:#fff; border:0; box-shadow:0 10px 30px rgba(0,0,0,.25);
+      -webkit-tap-highlight-color:transparent;
+    }
+    .start:active{ transform:translateY(1px) }
 
-        /* Style for each individual emoji */
-        .thumb {
-            position: absolute;
-            /* Start off-screen at the top */
-            top: -100px; 
-            
-            /* Disable user selection */
-            user-select: none;
-            -webkit-user-select: none;
+    .play{ position:fixed; inset:0; display:none; overflow:hidden }
+    .hud{ position:absolute; inset-inline:10px; top:10px; display:flex; justify-content:flex-end; gap:8px; pointer-events:none }
+    .chip{ pointer-events:auto; background:rgba(0,0,0,.35); color:#fff; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); font-weight:800; font-size:12px }
+    .toast{ position:absolute; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(0,0,0,.55); padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16); font-weight:700; font-size:13px; opacity:0; transition:opacity .2s ease }
+    .toast.show{ opacity:1 }
 
-            /* Set the animation */
-            animation-name: fall;
-            animation-timing-function: linear; /* A constant speed feels more natural for falling */
-            animation-iteration-count: 1; /* Animation plays once */
-            animation-fill-mode: forwards; /* Element stays at the final state of the animation */
-        }
+    .piece{ position:absolute; will-change:transform,opacity; font-weight:900; text-shadow:0 1px 0 rgba(0,0,0,.15), 0 0 8px rgba(255,255,255,.15); transform:translate(-50%,-50%) }
+    .piece.img{ text-shadow:none; filter: drop-shadow(0 6px 18px rgba(0,0,0,.35)); pointer-events:none; user-select:none }
+    .fall{ animation:fall linear forwards }
+    @keyframes fall{ 0%{ transform:translate(calc(-50% + var(--sx,0)),calc(-50% + var(--sy,0))) rotate(var(--rt,0deg)) scale(var(--sc,1)); opacity:1 } 100%{ transform:translate(calc(-50% + var(--ex,0)),calc(-50% + var(--ey,300px))) rotate(calc(var(--rt,0deg) + 180deg)) scale(var(--sc,1)); opacity:0 } }
+    .pop{ animation:pop .35s cubic-bezier(.2,.9,.2,1) forwards }
+    @keyframes pop{ 0%{ transform:translate(-50%,-50%) scale(.2); opacity:0 } 60%{ opacity:1 } 100%{ transform:translate(-50%,-50%) scale(1); opacity:1 } }
+    .fade{ animation:fade .8s ease forwards }
+    @keyframes fade{ from{ opacity:0 } to{ opacity:1 } }
 
-        /* The keyframe animation for falling */
-        @keyframes fall {
-            from {
-                /* The emoji starts above the screen and is fully visible */
-                transform: translateY(0) rotate(0);
-                opacity: 1;
-            }
-            to {
-                /* The emoji falls to just below the screen and fades out */
-                transform: translateY(110vh) rotate(360deg);
-                opacity: 0;
-            }
-        }
-    </style>
+    .shake{ animation:shake .35s linear 1 }
+    @keyframes shake{ 0%,100%{ transform:translate(0,0) } 20%{ transform:translate(3px,-2px) } 40%{ transform:translate(-3px,2px) } 60%{ transform:translate(2px,3px) } 80%{ transform:translate(-2px,-3px) } }
+
+    .flash{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.15), transparent); opacity:0; pointer-events:none; transition:opacity .25s ease }
+    .flash.show{ opacity:1 }
+
+    @media (prefers-reduced-motion: reduce){
+      .fall{ animation:appear .25s ease-out forwards }
+      @keyframes appear{ from{ opacity:0 } to{ opacity:1 } }
+      .shake{ animation:none }
+    }
+
+    .smirk{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(.2); font-size:120px; filter:drop-shadow(0 8px 24px rgba(0,0,0,.35)); opacity:0 }
+    .smirk.show{ animation:smirkIn .8s cubic-bezier(.2,.9,.2,1) forwards }
+    @keyframes smirkIn{ to{ transform:translate(-50%,-50%) scale(1); opacity:1 } }
+
+    .speaker{ width:32px; height:32px; border-radius:999px; display:grid; place-items:center; }
+  </style>
 </head>
 <body>
-    <script>
-        // Wait until the HTML document is fully loaded and parsed
-        document.addEventListener('DOMContentLoaded', () => {
-            const body = document.body;
-            
-            // --- Configuration ---
-            const EMOJI = '👎🏿'; // Change the emoji here. You can use '👎', '👎🏻', '👎🏽', etc.
-            const EMOJIS_PER_SECOND = 15; // How many new emojis to create per second
+  <div class="wrap" id="wrap">
+    <button class="start" id="startBtn" aria-label="Start">اضغط هنا</button>
+  </div>
 
-            function createThumb() {
-                const thumbElement = document.createElement('div');
-                thumbElement.classList.add('thumb');
-                thumbElement.textContent = EMOJI;
+  <main class="play" id="play" aria-label="Play field" tabindex="0">
+    <div class="hud">
+      <button class="chip speaker" id="muteBtn" aria-pressed="false" title="Sound">🔊</button>
+    </div>
+    <div class="smirk" id="smirk" aria-hidden="true">😏</div>
+    <div class="toast" id="toast" aria-live="polite">ضغط مطول للفوضى</div>
+    <div class="flash" id="flash"></div>
+  </main>
 
-                // --- Randomize Visuals for a More Dynamic Effect ---
+  <audio id="sfxLisah" src="falafel.mp3" preload="auto" playsinline></audio>
+  <audio id="sfxKeko" src="keko.mp3" preload="auto" playsinline></audio>
 
-                // 1. Random horizontal starting position (from 0% to 100% of the screen width)
-                thumbElement.style.left = `${Math.random() * 100}vw`;
+<script>
+(()=>{
+  const wrap = document.getElementById('wrap');
+  const startBtn = document.getElementById('startBtn');
+  const play = document.getElementById('play');
+  const smirk = document.getElementById('smirk');
+  const toast = document.getElementById('toast');
+  const muteBtn = document.getElementById('muteBtn');
+  const flash = document.getElementById('flash');
+  const sfxLisah = document.getElementById('sfxLisah');
+  const sfxKeko = document.getElementById('sfxKeko');
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-                // 2. Random size (from 24px to 64px)
-                const randomSize = Math.random() * 40 + 24;
-                thumbElement.style.fontSize = `${randomSize}px`;
+  let pressTimer = null; let muted = false; // sound on by default
 
-                // 3. Random animation duration (from 3 to 8 seconds)
-                const randomDuration = Math.random() * 5 + 3;
-                thumbElement.style.animationDuration = `${randomDuration}s`;
-                
-                // 4. Random animation delay (from 0 to 1 second)
-                // This spreads out their start times even more
-                const randomDelay = Math.random() * 1;
-                thumbElement.style.animationDelay = `${randomDelay}s`;
+  // utilities
+  function showToast(msg, t=1000){ toast.textContent = msg; toast.classList.add('show'); clearTimeout(showToast.tid); showToast.tid = setTimeout(()=>toast.classList.remove('show'), t); }
+  function rand(min,max){ return Math.random()*(max-min)+min }
+  function pickColor(){ const p=['#7c3aed','#10b981','#f59e0b','#06b6d4','#e11d48','#a3e635']; return p[(Math.random()*p.length)|0] }
 
-                // 5. Random starting rotation for a bit of tumble
-                thumbElement.style.transform = `rotate(${Math.random() * 90 - 45}deg)`;
+  // token chooser
+  const LTXT = 'لسه';
+  function chooseToken(){
+    const roll = Math.random();
+    if(roll < 0.10) return { type:'keko', mode:'text', text:'كيكو' };
+    if(roll < 0.40) return { type:'smirk', mode:'text', text:'😏' };
+    if(Math.random() < 0.35) return { type:'lisah', mode:'img', src:'lisah.png' };
+    return { type:'lisah', mode:'text', text:LTXT };
+  }
 
-                // Add the new emoji to the page
-                body.appendChild(thumbElement);
+  // audio per token
+  function playForToken(token){
+    if(muted) return;
+    try{
+      if(token.type==='keko'){ sfxKeko.currentTime = 0; sfxKeko.play(); }
+      else if(token.type==='lisah'){ sfxLisah.currentTime = 0; sfxLisah.play(); }
+    }catch(e){}
+  }
+  function playBoom(){ if(muted) return; try{ sfxLisah.currentTime = 0; sfxLisah.play(); }catch(e){} }
 
-                // --- Performance: Clean up by removing the element after it animates ---
-                // The 'animationend' event fires when the CSS animation is complete.
-                thumbElement.addEventListener('animationend', () => {
-                    thumbElement.remove(); // This is crucial for performance!
-                });
-            }
-            
-            // --- Run the Animation ---
-            // Use setInterval to create new emojis at a regular rate for a continuous effect.
-            // 1000ms / EMOJIS_PER_SECOND gives us the interval time.
-            setInterval(createThumb, 1000 / EMOJIS_PER_SECOND);
-        });
-    </script>
+  // helpers
+  function makePiece(token, x, y, size){
+    let el;
+    if(token.mode === 'img'){
+      el = document.createElement('img'); el.src = token.src; el.alt = '';
+      el.className = 'piece img'; el.style.width = (size || rand(40,72)) + 'px';
+    } else {
+      el = document.createElement('span'); el.className = 'piece'; el.textContent = token.text; el.style.fontSize = (size || rand(18,42)) + 'px'; el.style.color = pickColor();
+    }
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    return el;
+  }
+  function spawnParrots(x,y, n){
+    const parrot = { type:'parrot', mode:'text', text:'🦜' };
+    const count = n || 12 + (Math.random()*8|0);
+    for(let i=0;i<count;i++){
+      const el = makePiece(parrot, x + rand(-90,90), y + rand(-60,60), rand(24,38));
+      el.classList.add('pop'); play.appendChild(el); setTimeout(()=>el.remove(), 1200);
+    }
+  }
+  function spawnYemenFlags(x,y){
+    const flag = { type:'flag', mode:'text', text:'🇾🇪' };
+    const count = 6 + (Math.random()*6|0);
+    for(let i=0;i<count;i++){
+      const el = makePiece(flag, x + rand(-120,120), y + rand(-80,80), rand(22,34));
+      el.classList.add('pop'); play.appendChild(el); setTimeout(()=>el.remove(), 1200);
+    }
+  }
+
+  // effects that use token glyph
+  function rainBurst(x,y, token){
+    const total = 26 + (Math.random()*18|0);
+    for(let i=0;i<total;i++){
+      const el = makePiece(token, x, y);
+      el.classList.add('fall');
+      const dx = rand(-180, 180); const dy = rand(140, 360);
+      el.style.setProperty('--sx','0px'); el.style.setProperty('--sy','0px');
+      el.style.setProperty('--ex', dx + 'px'); el.style.setProperty('--ey', dy + 'px');
+      el.style.setProperty('--rt', rand(-120,120) + 'deg'); el.style.setProperty('--sc', rand(.85,1.25));
+      el.style.animationDuration = (prefersReduced ? 220 : rand(900,1600)) + 'ms';
+      play.appendChild(el);
+      setTimeout(()=>el.remove(), prefersReduced ? 300 : 1800);
+    }
+  }
+
+  function bouncyFloor(x,y, token){
+    const total = 18 + (Math.random()*12|0);
+    const rect = play.getBoundingClientRect();
+    for(let i=0;i<total;i++){
+      const el = makePiece(token, x, y, token.mode==='img' ? rand(34,64) : rand(20,36));
+      play.appendChild(el);
+      const body = { el, x, y, vx: rand(-2.2,2.2), vy: rand(-1.5,-3.5), life: 140 + (Math.random()*80|0) };
+      bodies.push(body);
+    }
+    tick();
+  }
+
+  function spiralStorm(x,y, token){
+    const pts = 40;
+    for(let i=0;i<pts;i++){
+      const ang = i * 0.35; const r = 4 + i*3;
+      const el = makePiece(token, x + Math.cos(ang)*r, y + Math.sin(ang)*r, token.mode==='img'? 30: 22);
+      el.classList.add('pop'); play.appendChild(el);
+      setTimeout(()=>el.remove(), 1400);
+    }
+  }
+
+  function rippleText(x,y, token){
+    if(token.type==='lisah' && token.mode==='text'){
+      const letters = ['ل','س','ه'];
+      letters.forEach((ch,i)=>{
+        setTimeout(()=>{
+          const ring = 10 + i*8;
+          for(let k=0;k<ring;k++){
+            const ang = (k/ring)*Math.PI*2; const rx = Math.cos(ang)*(40+i*18); const ry = Math.sin(ang)*(40+i*18);
+            const el = makePiece({type:'lisah', mode:'text', text:ch}, x+rx, y+ry, 20);
+            el.className += ' fade'; play.appendChild(el);
+            setTimeout(()=>el.remove(), 900);
+          }
+        }, i*100);
+      });
+    } else {
+      const count = 16;
+      for(let i=0;i<count;i++){
+        const ang = (i/count)*Math.PI*2; const rx = Math.cos(ang)*70; const ry = Math.sin(ang)*70;
+        const el = makePiece(token, x+rx, y+ry, token.mode==='img'? 30: 22);
+        el.className += ' fade'; play.appendChild(el);
+        setTimeout(()=>el.remove(), 900);
+      }
+    }
+  }
+
+  function glitchFlash(x,y, token){
+    const el = makePiece(token, x, y, token.mode==='img'? 64: 64);
+    el.style.filter = 'drop-shadow(0 0 20px rgba(255,255,255,.35))';
+    play.appendChild(el);
+    let i = 0; const id = setInterval(()=>{
+      el.style.transform = `translate(-50%,-50%) translate(${rand(-8,8)}px,${rand(-4,4)}px)`;
+      el.style.opacity = Math.random()>.2?1:.2; i++; if(i>10){ clearInterval(id); el.remove(); }
+    }, prefersReduced? 40: 60);
+  }
+
+  // generic spectacle
+  function smirkBurst(x,y){ const token = { type:'smirk', mode:'text', text:'😏' }; rainBurst(x,y, token); }
+  function tornado(x,y){ const rect = play.getBoundingClientRect(); const nodes = [...play.querySelectorAll('.piece')]; if(nodes.length===0) return; nodes.slice(0, 120).forEach((el,idx)=>{ el.style.transition = prefersReduced ? 'opacity .25s' : 'transform .45s cubic-bezier(.2,.9,.2,1), opacity .45s'; el.style.transform = `translate(${x}px, ${y}px)`; el.style.opacity = .6; setTimeout(()=>{ el.style.transition = 'transform .45s ease, opacity .45s ease'; el.style.transform = `translate(${x + rand(-40,40)}px, ${y + rand(-40,40)}px)`; el.style.opacity = 1; }, 460 + idx*2); }); if(!prefersReduced){ play.classList.add('shake'); setTimeout(()=>play.classList.remove('shake'), 360); } else { flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 250); } }
+  function confettiColumns(){ const rect = play.getBoundingClientRect(); const cols = 6; const gap = rect.width/(cols+1); for(let c=1;c<=cols;c++){ const x = gap*c; const tk = {type:'lisah', mode:'text', text:LTXT}; rainBurst(x, 20, tk); if(Math.random()<0.35) spawnYemenFlags(x, 80); } }
+  function emojiGeyser(){ const rect = play.getBoundingClientRect(); const x = rect.width/2, y = rect.height-30; bouncyFloor(x, y, {type:'smirk', mode:'text', text:'😏'}); }
+  function curtainDrop(){ const rect = play.getBoundingClientRect(); const rows = 4; const cols = 7; const w = rect.width/(cols+1); const h = rect.height/(rows+1); for(let r=1;r<=rows;r++){ for(let c=1;c<=cols;c++){ const tk = Math.random()<0.25 ? {type:'lisah', mode:'img', src:'lisah.png'} : {type:'lisah', mode:'text', text:LTXT}; const el = makePiece(tk, w*c, -20, 28); el.classList.add('fall'); el.style.setProperty('--ex', rand(-20,20)+'px'); el.style.setProperty('--ey', (h*r + rand(20,60))+'px'); el.style.setProperty('--rt', rand(-30,30)+'deg'); el.style.animationDuration = (prefersReduced? 180 : rand(700,1200))+'ms'; play.appendChild(el); setTimeout(()=>el.remove(), 1600); if(tk.type==='lisah' && Math.random()<0.2) spawnYemenFlags(w*c, h*r); } } }
+  function comet(){ const rect = play.getBoundingClientRect(); const x0 = rand(0, rect.width*0.3); const y0 = rand(rect.height*0.1, rect.height*0.4); const dx = rect.width + 120; const dy = rect.height + 60; const steps = prefersReduced? 15: 40; for(let i=0;i<steps;i++){ setTimeout(()=>{ const t = i/steps; const x = x0 + t*dx; const y = y0 + t*dy; const tk = (i%3)? {type:'smirk', mode:'text', text:'😏'} : {type:'lisah', mode:'text', text:LTXT}; const el = makePiece(tk, x, y, 18 + i%5); el.style.opacity = .9; play.appendChild(el); setTimeout(()=>el.remove(), 900); if(tk.type==='lisah' && Math.random()<0.15) spawnYemenFlags(x, y); }, i*20); } }
+
+  // effect pools
+  const glyphEffects = [rainBurst, bouncyFloor, spiralStorm, rippleText, glitchFlash];
+  const genericEffects = [tornado, smirkBurst, comet];
+
+  function randomEffect(x,y){
+    const token = chooseToken();
+    const pool = token.type==='smirk' ? genericEffects.concat([rainBurst]) : glyphEffects;
+    const fx = pool[(Math.random()*pool.length)|0];
+    fx(x,y, token);
+    // audio rules
+    playForToken(token);
+    // pairing rules
+    if(token.type==='keko'){ spawnParrots(x,y); }
+    // flag rule for lisah
+    if(token.type==='lisah' && Math.random() < 0.4){ spawnYemenFlags(x,y); }
+  }
+
+  // physics tick for bouncy pieces
+  const bodies = []; let ticking = false;
+  function tick(){ if(ticking) return; ticking = true; const rect = play.getBoundingClientRect(); const g = prefersReduced? 0.001 : 0.12; const bounce = 0.62; const fric = 0.996; function step(){ for(let i=bodies.length-1;i>=0;i--){ const b = bodies[i]; b.vy += g; b.x += b.vx*6; b.y += b.vy*6; b.vx *= fric; b.vy *= fric; b.life--; if(b.y > rect.height-20){ b.y = rect.height-20; b.vy *= -bounce; b.vx *= 0.96; } if(b.x < 20 || b.x > rect.width-20){ b.vx *= -bounce; } b.el.style.left = b.x + 'px'; b.el.style.top = b.y + 'px'; if(b.life <= 0){ b.el.style.opacity = 0; b.el.remove(); bodies.splice(i,1); } } if(bodies.length){ requestAnimationFrame(step); } else { ticking = false; } } requestAnimationFrame(step); }
+
+  function chaos(x,y){ playForToken({type:'lisah'}); const rect = play.getBoundingClientRect(); let t = 0; const spam = setInterval(()=>{ const rx = rand(40, rect.width-40); const ry = rand(40, rect.height-40); randomEffect(rx, ry); t++; if(t>12){ clearInterval(spam); } }, 140); if(!prefersReduced){ play.classList.add('shake'); setTimeout(()=>play.classList.remove('shake'), 360); } else { flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 250); } }
+
+  function startShow(){ wrap.style.display = 'none'; play.style.display = 'block'; playBoom(); smirk.classList.add('show'); setTimeout(()=> smirk.classList.remove('show'), 900); const r = play.getBoundingClientRect(); const cx = r.width/2, cy = r.height/2; curtainDrop(); setTimeout(()=>randomEffect(cx, cy), 150); setTimeout(()=>emojiGeyser(), 350); setTimeout(()=>confettiColumns(), 600); showToast('ضغط مطول للفوضى'); }
+
+  // interactions
+  startBtn.addEventListener('click', startShow, { passive:true });
+  play.addEventListener('pointerdown', e=>{ pressTimer = setTimeout(()=>{ const r = play.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; chaos(x,y); }, 500); });
+  play.addEventListener('pointerup', ()=>{ clearTimeout(pressTimer); pressTimer = null; });
+  play.addEventListener('pointercancel', ()=>{ clearTimeout(pressTimer); pressTimer = null; });
+  play.addEventListener('pointerdown', e=>{ const r = play.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; randomEffect(x,y); });
+  play.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ const r=play.getBoundingClientRect(); randomEffect(r.width/2,r.height/2); e.preventDefault(); } });
+
+  // mute toggle
+  muteBtn.addEventListener('click', ()=>{
+    const nowMuted = muteBtn.getAttribute('aria-pressed') === 'true' ? false : true;
+    muteBtn.setAttribute('aria-pressed', String(nowMuted));
+    muted = nowMuted; muteBtn.textContent = muted ? '🔇' : '🔊';
+    if(!muted) playBoom();
+  });
+})();
+</script>
 </body>
 </html>
