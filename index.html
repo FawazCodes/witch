@@ -248,82 +248,127 @@
 
   // always drifting background car
   function startDrift(){
-    const rect = play.getBoundingClientRect();
-    let x = rect.width*0.3, y = rect.height*0.72;
-    let theta = -0.35; // heading radians
-    let vx = 220, vy = -40; // px per sec
-    let omega = 0; // yaw rate
-    let last = 0; let tailLen = 120;
+    const field = play.getBoundingClientRect();
+    let x = field.width*0.25, y = field.height*0.7;
+    let theta = -0.4; // heading
+    // body frame velocities
+    let u = 360; // forward px per s
+    let v = 0;   // lateral px per s
+    let rYaw = 0; // yaw rate rad per s
+    let last = 0;
 
-    // drift targets
-    let side = Math.random() < 0.5 ? -1 : 1; // left or right drift
-    let targetBeta = side * rand(0.55, 0.85); // slip angle in radians
-    let targetSpeed = rand(320, 460); // px per sec
-    let nextSwitch = performance.now() + rand(900, 1800);
-    let nextEbrake = performance.now() + rand(1200, 2600);
-    let ebrakeUntil = 0; // low grip window
+    // bicycle model params (pixel normalized)
+    const a = 70; // CG to front axle px
+    const b = 70; // CG to rear axle px
+    const invM = 1/1400; // pseudo 1/mass
+    const invIz = 1/50000; // pseudo 1/inertia
+    const CfBase = 18000; // front cornering stiffness
+    const CrBase = 12000; // rear cornering stiffness
+    const steerMax = 0.75; // rad
 
-    function norm(a){ while(a > Math.PI) a -= Math.PI*2; while(a < -Math.PI) a += Math.PI*2; return a; }
-    function smoke(px,py, strong){ if(prefersReduced) return; const s = document.createElement('div'); s.className='smoke'; if(strong) s.style.width = s.style.height = '22px'; s.style.left = px+'px'; s.style.top = py+'px'; appendSmoke(s); requestAnimationFrame(()=> s.classList.add('out')); setTimeout(()=>s.remove(), 900); }
+    let mu = 1.15; // friction
+    let Cf = CfBase;
+    let Cr = CrBase*0.85; // slight oversteer bias
+
+    // autopilot targets for sustained drift
+    let side = Math.random()<0.5 ? -1 : 1;
+    let targetBeta = side*rand(0.65,1.05); // slip target
+    let targetSpeed = rand(420,560);
+    let nextSwitch = performance.now() + rand(700,1400);
+    let nextEbrake = performance.now() + rand(900,2000);
+    let ebrakeUntil = 0;
+
+    function clamp(t, lo, hi){ return t<lo?lo:(t>hi?hi:t); }
+    function norm(a){ while(a>Math.PI) a-=Math.PI*2; while(a<-Math.PI) a+=Math.PI*2; return a; }
+
+    function smoke(px,py,strong){ if(prefersReduced) return; const s=document.createElement('div'); s.className='smoke'; if(strong){ s.style.width=s.style.height='24px'; } s.style.left=px+'px'; s.style.top=py+'px'; appendSmoke(s); requestAnimationFrame(()=>s.classList.add('out')); setTimeout(()=>s.remove(),900); }
+
+    // light interaction with nearby pieces
+    let interactTick = 0;
 
     function step(ts){
-      if(!last) last = ts; const dt = Math.min(0.032, (ts - last)/1000); last = ts; // cap dt
-      const r = play.getBoundingClientRect();
+      if(!last) last = ts; const dt = Math.min(0.032, (ts-last)/1000); last = ts;
+      const rect = play.getBoundingClientRect();
 
-      // choose new drift intent periodically
-      if(ts > nextSwitch){ side = Math.random()<0.5 ? -1 : 1; targetBeta = side * rand(0.55, 0.9); targetSpeed = rand(320, 500); nextSwitch = ts + rand(900, 1800); }
-      if(ts > nextEbrake){ ebrakeUntil = ts + rand(220, 360); nextEbrake = ts + rand(1200, 2600); }
+      // retarget drift side and speed
+      if(ts>nextSwitch){ side = Math.random()<0.5?-1:1; targetBeta = side*rand(0.65,1.05); targetSpeed = rand(420,560); nextSwitch = ts + rand(700,1400); }
+      if(ts>nextEbrake){ ebrakeUntil = ts + rand(180,320); nextEbrake = ts + rand(900,2000); }
 
-      // kinematics
-      const speed = Math.hypot(vx, vy) + 1e-6; // avoid div by zero
-      const psi = Math.atan2(vy, vx); // velocity direction
-      let beta = norm(psi - theta); // slip angle
+      // steering control with counter steer toward target slip
+      const beta = norm(Math.atan2(v,u));
+      let delta = clamp(-1.4*(beta - targetBeta) - 0.15*rYaw, -steerMax, steerMax);
 
-      // control: push yaw toward target slip, countersteer a bit
-      const torque = (targetBeta - beta) * 10.0; // stronger yaw authority
-      omega += torque * dt;
-      theta += omega * dt;
-      omega *= 0.985; // yaw damping
+      // grip model with ebrake reducing rear grip
+      if(ts < ebrakeUntil){ mu = 0.85; Cr = CrBase*0.35; } else { mu = 1.15; Cr = CrBase*0.85; }
 
-      // throttle toward target speed
-      const acc = 300; // forward accel
-      const fcx = Math.cos(theta), fcy = Math.sin(theta); // forward dir
-      const rcx = -Math.sin(theta), rcy = Math.cos(theta); // right dir
-      if(speed < targetSpeed) { vx += fcx * acc * dt; vy += fcy * acc * dt; }
+      // slip angles
+      const af = norm(Math.atan2(v + a*rYaw, Math.max(1,u)) - delta);
+      const ar = norm(Math.atan2(v - b*rYaw, Math.max(1,u)));
 
-      // lateral dynamics: generate sideways force proportional to slip
-      const latPush = (ebrakeUntil > ts ? 240 : 140) * beta; // more push when e-braking
-      vx += rcx * latPush * dt; vy += rcy * latPush * dt;
+      // lateral forces with saturation
+      let Fyf = -Cf * af;
+      let Fyr = -Cr * ar;
+      const FyMaxF = mu*12000, FyMaxR = mu*9000;
+      Fyf = clamp(Fyf, -FyMaxF, FyMaxF);
+      Fyr = clamp(Fyr, -FyMaxR, FyMaxR);
 
-      // drag: stronger laterally for drift look, even stronger under e-brake
-      const longDrag = ebrakeUntil > ts ? 0.988 : 0.994;
-      const latDrag = ebrakeUntil > ts ? 0.94 : 0.965;
-      // project current velocity into forward and sideways to apply anisotropic drag
-      let vF = vx*fcx + vy*fcy; let vS = vx*rcx + vy*rcy;
-      vF *= longDrag; vS *= latDrag;
-      vx = vF*fcx + vS*rcx; vy = vF*fcy + vS*rcy;
+      // engine and brake along body x
+      const speed = Math.hypot(u,v);
+      let ax = speed < targetSpeed ? 280 : -180;
+      if(ts < ebrakeUntil) ax -= 120;
 
-      // integrate position
-      x += vx * dt; y += vy * dt;
+      // body dynamics
+      u += dt*(ax + rYaw*v + (-Fyf*Math.sin(delta))*invM);
+      v += dt*((Fyr + Fyf*Math.cos(delta))*invM - rYaw*u);
+      rYaw += dt*((a*Fyf*Math.cos(delta) - b*Fyr)*invIz);
 
-      // boundaries: bounce plus spin kick and keep drifting along the wall
-      const m = 40; // margin
-      if(x < m){ x = m; vx = Math.abs(vx)*0.65; omega += 1.2; side = 1; targetBeta = rand(0.6,0.9); }
-      if(x > r.width - m){ x = r.width - m; vx = -Math.abs(vx)*0.65; omega -= 1.2; side = -1; targetBeta = -rand(0.6,0.9); }
-      if(y < m){ y = m; vy = Math.abs(vy)*0.65; omega += 0.9; }
-      if(y > r.height - m){ y = r.height - m; vy = -Math.abs(vy)*0.65; omega -= 0.9; }
+      // integrate position in world frame
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      const wx = u*ct - v*st;
+      const wy = u*st + v*ct;
+      x += wx*dt; y += wy*dt; theta += rYaw*dt;
 
-      // rear tire location for smoke
-      const carW = drifter.getBoundingClientRect().width || 260;
-      tailLen = carW*0.46;
-      const tailX = x - fcx*tailLen + rcx*rand(-10,10);
-      const tailY = y - fcy*tailLen + rcy*rand(-10,10);
-      const sideways = Math.abs(vS);
-      if(!prefersReduced && (Math.abs(beta) > 0.35 || sideways > 90)){
-        smoke(tailX, tailY, Math.abs(beta) > 0.6 || ebrakeUntil > ts);
+      // boundaries with reflection and spin kick
+      const m = 40;
+      if(x < m || x > rect.width - m){
+        x = clamp(x, m, rect.width - m);
+        const nx = x < rect.width*0.5 ? 1 : -1;
+        const rwx = -wx*0.6; const rwy = wy; // reflect X
+        // convert reflected world vel back to body
+        u = rwx*ct + rwy*st; v = -rwx*st + rwy*ct; rYaw += 1.0*nx;
+      }
+      if(y < m || y > rect.height - m){
+        y = clamp(y, m, rect.height - m);
+        const ny = y < rect.height*0.5 ? 1 : -1;
+        const rwx = wx; const rwy = -wy*0.6; // reflect Y
+        u = rwx*ct + rwy*st; v = -rwx*st + rwy*ct; rYaw -= 0.8*ny;
       }
 
-      // render
+      // rear tire world position
+      const tailLen = (drifter.getBoundingClientRect().width||260)*0.46;
+      const rearX = x - ct*tailLen;
+      const rearY = y - st*tailLen;
+      if(!prefersReduced && (Math.abs(ar) > 0.35 || ts < ebrakeUntil)){
+        smoke(rearX, rearY, Math.abs(ar) > 0.6 || ts < ebrakeUntil);
+      }
+
+      // lightweight interaction: blow away a few recent pieces near the car
+      if((interactTick = (interactTick+1)%2) === 0){
+        const nodes = play.querySelectorAll('.piece');
+        const N = nodes.length; const from = Math.max(0, N-50);
+        for(let i=from;i<N;i++){
+          const n = nodes[i];
+          const nx = parseFloat(n.style.left)||0; const ny = parseFloat(n.style.top)||0;
+          const dx = nx - x, dy = ny - y; const d = Math.hypot(dx,dy);
+          if(d < 110){
+            const push = (110 - d)*0.08;
+            n.style.left = (nx + dx/d*push) + 'px';
+            n.style.top = (ny + dy/d*push) + 'px';
+          }
+        }
+      }
+
+      // render sprite
       drifter.style.transform = `translate(${x}px, ${y}px) rotate(${theta}rad)`;
       requestAnimationFrame(step);
     }
