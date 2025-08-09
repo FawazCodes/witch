@@ -1,13 +1,518 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Judah</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Judy • v2</title>
+
+  <!-- Ensure relative asset paths work on GitHub Pages repo subpaths -->
+  <base href="./">
+
+  <!-- Favicons -->
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="mask-icon" href="safari-pinned-tab.svg" color="#7c3aed">
+  <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+
+  <!-- Preloads for faster first paint -->
+  <link rel="preload" as="image" href="drift.png">
+  <link rel="preload" as="image" href="lisah.png">
+  <link rel="preload" as="audio" href="falafel.mp3">
+  <link rel="preload" as="audio" href="keko.mp3">
+
   <style>
-    html, body { height: 100%; margin: 0; background: #fff; }
+    :root{
+      --bg:#0b0d12; --fg:#e5e7eb; --muted:#94a3b8;
+      --a:#7c3aed; --b:#10b981; --c:#f59e0b; --d:#06b6d4; --e:#e11d48; --f:#a3e635;
+      --density: 1; /* global density multiplier, controlled by settings */
+    }
+    @media (prefers-color-scheme: light){ :root{ --bg:#f6f7fb; --fg:#0b0d12; --muted:#475569; } }
+    *{ box-sizing:border-box }
+    html,body{ margin:0; height:100% }
+    body{
+      background: radial-gradient(1200px 800px at 70% -10%, rgba(124,58,237,.16), transparent 60%),
+                  radial-gradient(1000px 600px at 10% 110%, rgba(16,185,129,.13), transparent 60%),
+                  var(--bg);
+      color:var(--fg);
+      font:16px/1.5 ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple Color Emoji, Segoe UI Emoji, sans-serif;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      touch-action:manipulation; user-select:none;
+    }
+    .wrap{ height:100%; display:grid; place-items:center; padding:24px }
+    .start{
+      position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.6rem;
+      padding:18px 28px; font-weight:900; font-size:20px; border-radius:999px; cursor:pointer;
+      background:linear-gradient(135deg,var(--a),var(--b)); color:#fff; border:0; box-shadow:0 10px 30px rgba(0,0,0,.25);
+      -webkit-tap-highlight-color:transparent;
+    }
+    .start:active{ transform:translateY(1px) }
+
+    .play{ position:fixed; inset:0; display:none; overflow:hidden; contain:content; backface-visibility:hidden }
+    .hud{ position:absolute; inset-inline:10px; top:10px; display:flex; justify-content:flex-end; gap:8px; pointer-events:none; z-index:6 }
+    .chip{ pointer-events:auto; background:rgba(0,0,0,.35); color:#fff; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); font-weight:800; font-size:12px; backdrop-filter: blur(6px) saturate(1.2) }
+    .toast{ position:absolute; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(0,0,0,.55); padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16); font-weight:700; font-size:13px; opacity:0; transition:opacity .2s ease; z-index:6 }
+    .toast.show{ opacity:1 }
+
+    .piece{ position:absolute; will-change:transform,opacity; font-weight:900; text-shadow:0 1px 0 rgba(0,0,0,.08), 0 0 4px rgba(255,255,255,.08); transform:translate(-50%, -50%); transition: transform .2s ease; contain:content; z-index:2 }
+    .piece.img{ text-shadow:none; filter: drop-shadow(0 4px 10px rgba(0,0,0,.25)); pointer-events:none; user-select:none }
+    .magnify{ transform:translate(-50%,-50%) scale(1.25) !important }
+    .glitter{ animation:glitter .5s linear 4 }
+    @keyframes glitter{ from{ filter: drop-shadow(0 0 6px rgba(250,204,21,.55)) } to{ filter: drop-shadow(0 0 2px rgba(250,204,21,.2)) } }
+
+    .fall{ animation:fall linear forwards }
+    @keyframes fall{ 0%{ transform:translate(calc(-50% + var(--sx,0)),calc(-50% + var(--sy,0))) rotate(var(--rt,0deg)) scale(var(--sc,1)); opacity:1 } 100%{ transform:translate(calc(-50% + var(--ex,0)),calc(-50% + var(--ey,240px))) rotate(calc(var(--rt,0deg) + 180deg)) scale(var(--sc,1)); opacity:0 } }
+    .pop{ animation:pop .28s cubic-bezier(.2,.9,.2,1) forwards }
+    @keyframes pop{ 0%{ transform:translate(-50%,-50%) scale(.2); opacity:0 } 60%{ opacity:1 } 100%{ transform:translate(-50%,-50%) scale(1); opacity:1 } }
+    .fade{ animation:fade .6s ease forwards }
+    @keyframes fade{ from{ opacity:0 } to{ opacity:1 } }
+
+    .shake{ animation:shake .28s linear 1 }
+    @keyframes shake{ 0%,100%{ transform:translate(0,0) } 25%{ transform:translate(2px,-2px) } 50%{ transform:translate(-2px,2px) } 75%{ transform:translate(2px,2px) } }
+
+    .flash{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.15), transparent); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:5 }
+    .flash.show{ opacity:1 }
+
+    @media (prefers-reduced-motion: reduce){
+      .fall{ animation:appear .2s ease-out forwards }
+      @keyframes appear{ from{ opacity:0 } to{ opacity:1 } }
+      .shake{ animation:none }
+    }
+
+    .smirk{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(.2); font-size:110px; filter:drop-shadow(0 6px 18px rgba(0,0,0,.3)); opacity:0; z-index:3 }
+    .smirk.show{ animation:smirkIn .6s cubic-bezier(.2,.9,.2,1) forwards }
+    @keyframes smirkIn{ to{ transform:translate(-50%,-50%) scale(1); opacity:1 } }
+
+    .bob{ animation:bob .8s ease-in-out 6 }
+    @keyframes bob{ 0%,100%{ transform:translate(-50%,-50%) translateY(0) } 50%{ transform:translate(-50%,-50%) translateY(-5px) } }
+
+    .bump{ animation:bump .1s ease-out 1 }
+    @keyframes bump{ from{ transform:scale(.985) } to{ transform:scale(1) } }
+
+    .speaker{ width:32px; height:32px; border-radius:999px; display:grid; place-items:center; }
+    .gear{ width:32px; height:32px; border-radius:999px; display:grid; place-items:center; }
+
+    /* Drifter */
+    .drifter{ position:absolute; left:0; top:0; width:min(38vw, 420px); transform:translate(-1000px,-1000px) rotate(0deg); will-change:transform; pointer-events:none; user-select:none; filter: drop-shadow(0 10px 24px rgba(0,0,0,.35)); z-index:1; opacity:.96 }
+
+    /* Tire smoke 2.0: directional plume with wind drift */
+    .smoke{ position:absolute; width:18px; height:18px; border-radius:50%;
+            background:radial-gradient(40% 40% at 35% 35%, rgba(255,255,255,.7), rgba(120,120,120,.18) 70%, rgba(120,120,120,0) 100%);
+            filter: blur(1px); opacity:.82; transform:translate(-50%,-50%) scale(.6) rotate(var(--r,0deg));
+            transition: transform .95s cubic-bezier(.12,.82,.18,.99), opacity .95s linear; z-index:1 }
+    .smoke.out{ opacity:0; transform:translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) scale(1.75) rotate(var(--r2,0deg)) }
+
+    /* Settings panel */
+    .panel{ position:absolute; top:48px; inset-inline:10px; display:none; z-index:7 }
+    .card{ background:rgba(0,0,0,.45); color:#fff; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.15); font-size:13px; display:grid; gap:8px; backdrop-filter: blur(8px) saturate(1.1) }
+    .row{ display:flex; align-items:center; gap:10px; justify-content:space-between }
+    .row label{ font-weight:800; color:#e5e7eb }
+    input[type=range]{ width:140px }
   </style>
 </head>
 <body>
+  <div class="wrap" id="wrap">
+    <button class="start" id="startBtn" aria-label="Start">اضغط هنا</button>
+  </div>
+
+  <main class="play" id="play" aria-label="Play field" tabindex="0">
+    <img id="drifter" class="drifter" src="drift.png" srcset="drift.webp 1x, drift.png 1x" alt="" onerror="this.style.display='none'" />
+    <div class="hud">
+      <button class="chip gear" id="gearBtn" title="إعدادات" aria-expanded="false">⚙️</button>
+      <button class="chip speaker" id="muteBtn" aria-pressed="false" title="صوت">🔊</button>
+    </div>
+    <div class="panel" id="panel" role="dialog" aria-label="Settings">
+      <div class="card">
+        <div class="row"><label for="density">كثافة</label><input id="density" type="range" min="0.4" max="1.4" step="0.05" value="1"></div>
+        <div class="row"><label for="carToggle">السيارة</label><input id="carToggle" type="checkbox" checked></div>
+        <div class="row"><label for="smokeToggle">الدخان</label><input id="smokeToggle" type="checkbox" checked></div>
+        <div class="row"><label for="flagsToggle">أعلام اليمن</label><input id="flagsToggle" type="checkbox" checked></div>
+      </div>
+    </div>
+
+    <div class="smirk" id="smirk" aria-hidden="true">😏</div>
+    <div class="toast" id="toast" aria-live="polite">ضغط مطول للفوضى</div>
+    <div class="flash" id="flash"></div>
+  </main>
+
+  <audio id="sfxLisah" src="falafel.mp3" preload="auto" playsinline></audio>
+  <audio id="sfxKeko" src="keko.mp3" preload="auto" playsinline></audio>
+
+<script>
+(()=>{
+  'use strict';
+  const wrap = document.getElementById('wrap');
+  const startBtn = document.getElementById('startBtn');
+  const play = document.getElementById('play');
+  const smirk = document.getElementById('smirk');
+  const toast = document.getElementById('toast');
+  const muteBtn = document.getElementById('muteBtn');
+  const flash = document.getElementById('flash');
+  const sfxLisah = document.getElementById('sfxLisah');
+  const sfxKeko = document.getElementById('sfxKeko');
+  const drifter = document.getElementById('drifter');
+  const gearBtn = document.getElementById('gearBtn');
+  const panel = document.getElementById('panel');
+  const densityRange = document.getElementById('density');
+  const carToggle = document.getElementById('carToggle');
+  const smokeToggle = document.getElementById('smokeToggle');
+  const flagsToggle = document.getElementById('flagsToggle');
+
+  const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let pressTimer = null; let pressing = false; let muted = false;
+  let frozenUntil = 0; let lastTrail = 0; let pieceAdds = 0;
+  let preloadedImg = false; let lowMode = false; let flagsEnabled = true;
+  let showCar = true; let showSmoke = true;
+
+  // Save small prefs to localStorage
+  const storage = {
+    get k(){ return 'judy:settings'; },
+    load(){ try{ return JSON.parse(localStorage.getItem(this.k))||{} }catch(e){ return {} } },
+    save(obj){ try{ localStorage.setItem(this.k, JSON.stringify(obj)); }catch(e){} }
+  };
+  const saved = storage.load();
+
+  // Seeded RNG for reproducibility per session
+  let seed = saved.seed || Math.floor(Math.random()*1e9);
+  function sfc32(a){ return function(){ a|=0; a=a+0x9E3779B9|0; let t=a^a>>>16; t=t+ (t<<3)|0; t^=t>>>4; t=(t+ (t<<1))|0; t^=t>>>15; return (t>>>0)/4294967296 } }
+  let randu = sfc32(seed);
+  function rand(min,max){ return randu()*(max-min)+min }
+  function pick(arr){ return arr[(randu()*arr.length)|0] }
+
+  // Quality profile
+  const mem = navigator.deviceMemory || 4;
+  const quality = { density: (mem <= 3 ? 0.6 : 0.95), heavy: mem > 3 };
+  if(saved.density){ quality.density = +saved.density; }
+  document.documentElement.style.setProperty('--density', String(quality.density));
+
+  // FPS sampler to auto degrade
+  function startFPSWatch(){ let last = performance.now(); let samples = []; function loop(){ const now = performance.now(); const fps = 1000/(now - last); last = now; samples.push(fps); if(samples.length > 30) samples.shift(); const avg = samples.reduce((a,b)=>a+b,0)/samples.length; if(!lowMode && avg < 40){ lowMode = true; quality.density *= 0.7; quality.heavy = false; document.documentElement.style.setProperty('--density', String(quality.density)); } requestAnimationFrame(loop); } requestAnimationFrame(loop); }
+
+  // WebAudio micro ping tail
+  let actx = null; function ensureActx(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+  function ping(){ if(!actx) return; const o=actx.createOscillator(); const g=actx.createGain(); o.type='triangle'; o.frequency.value=1600; g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.18, actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.12); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+0.15); }
+  sfxKeko.addEventListener('ended', ()=>{ ensureActx(); ping(); });
+
+  // Utils
+  function showToast(msg, t=900){ toast.textContent = msg; toast.classList.add('show'); clearTimeout(showToast.tid); showToast.tid = setTimeout(()=>toast.classList.remove('show'), t); }
+  function pickColor(){ const p=['#7c3aed','#10b981','#f59e0b','#06b6d4','#e11d48','#a3e635']; return pick(p) }
+
+  // Soft cap
+  const MAX_PIECES = 220; const MAX_SMOKE = 110;
+  function enforceCap(){ const nodes = play.querySelectorAll('.piece'); if(nodes.length > MAX_PIECES){ const kill = nodes.length - MAX_PIECES; for(let i=0;i<kill;i++){ nodes[i].remove(); } } const sm = play.querySelectorAll('.smoke'); if(sm.length > MAX_SMOKE){ const kill = sm.length - MAX_SMOKE; for(let i=0;i<kill;i++){ sm[i].remove(); } } }
+  function appendPiece(el){ play.appendChild(el); if((pieceAdds = (pieceAdds+1)|0) % 16 === 0) enforceCap(); }
+  function appendSmoke(el){ play.appendChild(el); if((pieceAdds = (pieceAdds+1)|0) % 12 === 0) enforceCap(); }
+
+  // Micro spark
+  function spark(x,y){ const s = document.createElement('div'); s.style.position='absolute'; s.style.left=x+'px'; s.style.top=y+'px'; s.style.width='8px'; s.style.height='8px'; s.style.borderRadius='50%'; s.style.background='rgba(255,255,255,.8)'; s.style.transform='translate(-50%,-50%)'; s.style.opacity='1'; s.style.transition='opacity .1s ease, transform .1s ease'; appendPiece(s); requestAnimationFrame(()=>{ s.style.opacity='0'; s.style.transform='translate(-50%,-50%) scale(1.5)'; }); setTimeout(()=>s.remove(), 120); }
+
+  // Haptic sim
+  function haptic(){ play.classList.add('bump'); setTimeout(()=>play.classList.remove('bump'), 100); }
+
+  // Tokens
+  const LTXT = 'لسه';
+  function chooseToken(){ const r = randu(); if(r < 0.20) return { type:'lisah', mode:'text', text:LTXT, flags:true }; if(r < 0.40) return { type:'lisah', mode:'img', src:'lisah.png', flags:false }; if(r < 0.60) return { type:'keko', mode:'text', text:'كيكو' }; if(r < 0.90) return { type:'lisah', mode:'text', text:LTXT, flags:false }; return { type:'smirk', mode:'text', text:'😏' }; }
+
+  // Audio
+  function playForToken(token){ if(muted) return; try{ if(token.type==='keko'){ sfxKeko.currentTime = 0; sfxKeko.play(); } else if(token.type==='lisah'){ sfxLisah.currentTime = 0; sfxLisah.play(); } }catch(e){} }
+  function playBoom(){ if(muted) return; try{ sfxLisah.currentTime = 0; sfxLisah.play(); }catch(e){} }
+  function stutterFalafel(){ if(muted) return; try{ sfxLisah.pause(); sfxLisah.currentTime=0; sfxLisah.play(); setTimeout(()=>{ sfxLisah.pause(); sfxLisah.currentTime=.12; sfxLisah.play(); },110); }catch(e){} }
+
+  // Piece creator
+  function makePiece(token, x, y, size){ let el; if(token && token.mode === 'img'){ el = document.createElement('img'); el.src = token.src; el.alt = ''; el.loading = 'lazy'; el.decoding = 'async'; el.className = 'piece img'; el.style.width = (size || rand(36,64)) + 'px'; } else if(token){ el = document.createElement('span'); el.className = 'piece'; el.textContent = token.text; el.style.fontSize = (size || rand(18,36)) + 'px'; el.style.color = pickColor(); } else { el = document.createElement('div'); el.className = 'piece'; el.style.width='8px'; el.style.height='8px'; el.style.borderRadius='50%'; el.style.background='rgba(255,255,255,.85)'; } el.style.left = x + 'px'; el.style.top = y + 'px'; return el; }
+
+  function spawnParrots(x,y, n){ const parrot = { type:'parrot', mode:'text', text:'🦜' }; const count = Math.max(6, Math.round((n || 10) * quality.density)); for(let i=0;i<count;i++){ const el = makePiece(parrot, x + rand(-70,70), y + rand(-40,40), rand(22,32)); el.classList.add('pop'); appendPiece(el); setTimeout(()=>el.remove(), 900); } }
+  function spawnYemenFlags(x,y){ if(!flagsEnabled) return; const flag = { type:'flag', mode:'text', text:'🇾🇪' }; const count = Math.max(3, Math.round(6 * quality.density)); for(let i=0;i<count;i++){ const el = makePiece(flag, x + rand(-100,100), y + rand(-60,60), rand(20,28)); el.classList.add('pop'); appendPiece(el); setTimeout(()=>el.remove(), 900); } }
+
+  // Effects
+  function rainBurst(x,y, token){ const base = 22 + ((randu()*10)|0); const total = Math.max(12, Math.round(base * quality.density)); for(let i=0;i<total;i++){ const el = makePiece(token, x, y); el.classList.add('fall'); const dx = rand(-160, 160); const dy = rand(120, 300); el.style.setProperty('--sx','0px'); el.style.setProperty('--sy','0px'); el.style.setProperty('--ex', dx + 'px'); el.style.setProperty('--ey', dy + 'px'); el.style.setProperty('--rt', rand(-120,120) + 'deg'); el.style.setProperty('--sc', rand(.9,1.15)); el.style.animationDuration = (prefersReduced ? 200 : rand(700,1200)) + 'ms'; appendPiece(el); setTimeout(()=>el.remove(), prefersReduced ? 260 : 1200); } }
+
+  const bodies = []; let ticking = false;
+  function bouncyFloor(x,y, token){ const base = 12 + ((randu()*6)|0); const total = Math.max(6, Math.round(base * quality.density)); for(let i=0;i<total;i++){ const el = makePiece(token, x, y, token && token.mode==='img' ? rand(34,56) : rand(18,30)); appendPiece(el); const body = { el, x, y, vx: rand(-2,2), vy: rand(-1.4,-3), life: 110 + ((randu()*60)|0) }; bodies.push(body); } tick(); }
+
+  function spiralStorm(x,y, token){ const pts = Math.max(18, Math.round(30 * quality.density)); for(let i=0;i<pts;i++){ const ang = i * 0.35; const r = 4 + i*2.5; const el = makePiece(token, x + Math.cos(ang)*r, y + Math.sin(ang)*r, token && token.mode==='img'? 26: 20); el.classList.add('pop'); appendPiece(el); setTimeout(()=>el.remove(), 1100); } }
+
+  function rippleText(x,y, token){ if(token && token.type==='lisah' && token.mode==='text'){ const letters = ['ل','س','ه']; letters.forEach((ch,i)=>{ setTimeout(()=>{ const ring = 6 + i*6; for(let k=0;k<ring;k++){ const ang = (k/ring)*Math.PI*2; const rx = Math.cos(ang)*(36+i*16); const ry = Math.sin(ang)*(36+i*16); const el = makePiece({type:'lisah', mode:'text', text:ch}, x+rx, y+ry, 18); el.className += ' fade'; appendPiece(el); setTimeout(()=>el.remove(), 800); } }, i*90); }); } else { const count = Math.max(10, Math.round(14 * quality.density)); for(let i=0;i<count;i++){ const ang = (i/count)*Math.PI*2; const rx = Math.cos(ang)*64; const ry = Math.sin(ang)*64; const el = makePiece(token, x+rx, y+ry, token && token.mode==='img'? 26: 20); el.className += ' fade'; appendPiece(el); setTimeout(()=>el.remove(), 800); } } }
+
+  function glitchFlash(x,y, token){ const el = makePiece(token, x, y, 58); appendPiece(el); let i = 0; const id = setInterval(()=>{ el.style.transform = `translate(-50%,-50%) translate(${rand(-6,6)}px,${rand(-3,3)}px)`; el.style.opacity = randu()>.3?1:.25; i++; if(i>8){ clearInterval(id); el.remove(); } }, prefersReduced? 40: 50); }
+
+  // Signature extras
+  function goldenLisah(x,y){ const gold = { type:'lisah', mode:'text', text:LTXT }; const el = makePiece(gold, x, y, 52); el.style.color = '#facc15'; el.classList.add('pop','glitter'); appendPiece(el); setTimeout(()=>{ rainBurst(x,y,{type:'lisah', mode:'text', text:LTXT}); el.remove(); }, 360); }
+  function flagFireworks(x,y){ const ring = Math.max(8, Math.round(12 * quality.density)); for(let i=0;i<ring;i++){ const ang = (i/ring)*Math.PI*2; const rx = Math.cos(ang)*rand(36,80); const ry = Math.sin(ang)*rand(36,80); const el = makePiece({type:'flag', mode:'text', text:'🇾🇪'}, x+rx, y+ry, 18); el.className += ' fade'; appendPiece(el); setTimeout(()=>el.remove(), 800); } }
+  function smirkLens(x,y){ if(!quality.heavy) return; const big = document.createElement('div'); big.className='smirk show'; big.textContent='😏'; big.style.left=x+'px'; big.style.top=y+'px'; appendPiece(big); setTimeout(()=>big.remove(), 560); const nodes = [...play.querySelectorAll('.piece')].slice(-30); nodes.forEach(n=>{ const nx=parseFloat(n.style.left)||0; const ny=parseFloat(n.style.top)||0; const d=Math.hypot(nx-x, ny-y); if(d<110) n.classList.add('magnify'); setTimeout(()=>n.classList.remove('magnify'), 520); }); }
+  function ripplePortal(x,y){ if(!quality.heavy) return; const nodes = [...play.querySelectorAll('.piece')].slice(-30); nodes.forEach((n,i)=>{ n.style.transition = prefersReduced ? 'opacity .2s' : 'transform .3s cubic-bezier(.2,.9,.2,1), opacity .3s'; n.style.transform = `translate(-50%,-50%) translate(${x}px, ${y}px)`; n.style.opacity = .7; setTimeout(()=>{ n.style.opacity=1; }, 300 + i*2); }); setTimeout(()=>{ rippleText(x,y,{type:'lisah', mode:'text', text:LTXT}); }, 340); }
+
+  function parrotSpiral(x,y){ const pts=Math.max(10, Math.round(14 * quality.density)); for(let i=0;i<pts;i++){ const ang=i*(Math.PI*2/pts); const r=6+i*5; const el=makePiece({type:'parrot', mode:'text', text:'🦜'}, x+Math.cos(ang)*r, y+Math.sin(ang)*r, 20); el.classList.add('pop'); appendPiece(el); setTimeout(()=>el.remove(), 900); } }
+  function parrotPerch(x,y){ const el=makePiece({type:'parrot', mode:'text', text:'🦜'}, x, y-18, 26); el.classList.add('bob'); appendPiece(el); setTimeout(()=>el.remove(), 900); }
+
+  function meteor(){ const rect=playRect(); const startX=rand(-40, rect.width*0.2); const startY=rand(-20, rect.height*0.2); const steps = 24; flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 150); for(let i=0;i<steps;i++){ setTimeout(()=>{ const t=i/steps; const x=startX + t*(rect.width+100); const y=startY + t*(rect.height+70); const tk = (i%2)? {type:'smirk', mode:'text', text:'😏'} : {type:'lisah', mode:'text', text:LTXT}; const el=makePiece(tk,x,y,18+i%4); appendPiece(el); setTimeout(()=>el.remove(), 800); }, i*16); } }
+
+  function freezeFrame(){ frozenUntil = Date.now()+260; const nodes=play.querySelectorAll('.piece'); nodes.forEach(n=>{ n.style.animationPlayState='paused'; }); setTimeout(()=>{ nodes.forEach(n=> n.style.animationPlayState=''); frozenUntil=0; }, 260); }
+
+  function nameRoulette(x,y){ const holder=makePiece({type:'lisah', mode:'text', text:'?'}, x,y, 48); appendPiece(holder); const opts=['😏','كيكو',LTXT]; let i=0; const id=setInterval(()=>{ holder.textContent=opts[i%opts.length]; i++; }, 60); setTimeout(()=>{ clearInterval(id); const final = randu()<0.8? {type:'lisah', mode:'text', text:LTXT, flags:false} : {type:'keko', mode:'text', text:'كيكو'}; holder.remove(); playForToken(final); rainBurst(x,y, final); if(final.type==='keko'){ spawnParrots(x,y); parrotSpiral(x,y); parrotPerch(x,y); } }, 320); }
+
+  // Generic spectacle
+  function smirkBurst(x,y){ const token = { type:'smirk', mode:'text', text:'😏' }; rainBurst(x,y, token); }
+  function tornado(x,y){ if(!quality.heavy) return; const nodes = [...play.querySelectorAll('.piece')].slice(-60); if(nodes.length===0) return; nodes.forEach((el,idx)=>{ el.style.transition = prefersReduced ? 'opacity .2s' : 'transform .35s cubic-bezier(.2,.9,.2,1), opacity .35s'; el.style.transform = `translate(-50%,-50%) translate(${x}px, ${y}px)`; el.style.opacity = .6; setTimeout(()=>{ el.style.transition = 'transform .35s ease, opacity .35s ease'; el.style.transform = `translate(-50%,-50%) translate(${x + rand(-30,30)}px, ${y + rand(-30,30)}px)`; el.style.opacity = 1; }, 360 + idx*2); }); if(!prefersReduced){ play.classList.add('shake'); setTimeout(()=>play.classList.remove('shake'), 280); } else { flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 200); } }
+  function confettiColumns(){ const rect = playRect(); const cols = 4; const gap = rect.width/(cols+1); for(let c=1;c<=cols;c++){ const x = gap*c; const tk = {type:'lisah', mode:'text', text:LTXT}; rainBurst(x, 20, tk); } }
+  function emojiGeyser(){ const rect = playRect(); const x = rect.width/2, y = rect.height-30; bouncyFloor(x, y, {type:'smirk', mode:'text', text:'😏'}); }
+  function curtainDrop(){ const rect = playRect(); const rows = 3; const cols = 6; const w = rect.width/(cols+1); const h = rect.height/(rows+1); for(let r=1;r<=rows;r++){ for(let c=1;c<=cols;c++){ const tk = randu()<0.2 ? {type:'lisah', mode:'img', src:'lisah.png'} : {type:'lisah', mode:'text', text:LTXT}; const el = makePiece(tk, w*c, -20, 26); el.classList.add('fall'); el.style.setProperty('--ex', rand(-16,16)+'px'); el.style.setProperty('--ey', (h*r + rand(16,40))+'px'); el.style.setProperty('--rt', rand(-24,24)+'deg'); el.style.animationDuration = (prefersReduced? 160 : rand(600,1000))+'ms'; appendPiece(el); setTimeout(()=>el.remove(), 1300); } } }
+  function comet(){ if(!quality.heavy) return; const rect = playRect(); const x0 = rand(0, rect.width*0.3); const y0 = rand(rect.height*0.1, rect.height*0.4); const dx = rect.width + 100; const dy = rect.height + 60; const steps = 24; for(let i=0;i<steps;i++){ setTimeout(()=>{ const t = i/steps; const x = x0 + t*dx; const y = y0 + t*dy; const tk = (i%3)? {type:'smirk', mode:'text', text:'😏'} : {type:'lisah', mode:'text', text:LTXT}; const el = makePiece(tk, x, y, 16 + i%4); el.style.opacity = .9; appendPiece(el); setTimeout(()=>el.remove(), 800); }, i*18); } }
+
+  const glyphEffects = [rainBurst, bouncyFloor, spiralStorm, rippleText, glitchFlash];
+  const genericEffects = [smirkBurst, comet, tornado];
+
+  function randomEffect(x,y){
+    if(randu() < 0.005){ meteor(); return; }
+    if(randu() < 0.003){ freezeFrame(); }
+    if(randu() < 0.05){ nameRoulette(x,y); return; }
+
+    const token = chooseToken();
+
+    if(token.type==='lisah' && token.mode==='text' && !token.flags && randu()<0.06){
+      goldenLisah(x,y);
+      playForToken(token);
+      return;
+    }
+
+    const pool = token.type==='smirk' ? [smirkBurst].concat(quality.heavy ? [comet, tornado] : []) : glyphEffects;
+    const fx = pick(pool);
+    fx(x,y, token);
+
+    playForToken(token);
+
+    if(token.type==='keko'){
+      spawnParrots(x,y); parrotSpiral(x,y); parrotPerch(x,y);
+    }
+    if(token.type==='lisah' && token.flags){
+      spawnYemenFlags(x,y);
+      if(randu()<0.5) flagFireworks(x,y);
+    }
+
+    if(quality.heavy && randu()<0.1) smirkLens(x,y);
+    if(quality.heavy && randu()<0.08) ripplePortal(x,y);
+  }
+
+  // Physics tick for bouncy pieces with freeze support
+  function tick(){ if(ticking) return; ticking = true; const rect = playRect(); const g = prefersReduced? 0.001 : 0.10; const bounce = 0.6; const fric = 0.996; function step(){ if(frozenUntil && Date.now() < frozenUntil){ requestAnimationFrame(step); return; } for(let i=bodies.length-1;i>=0;i--){ const b = bodies[i]; b.vy += g; b.x += b.vx*6; b.y += b.vy*6; b.vx *= fric; b.vy *= fric; b.life--; if(b.y > rect.height-20){ b.y = rect.height-20; b.vy *= -bounce; b.vx *= 0.96; } if(b.x < 20 || b.x > rect.width-20){ b.vx *= -bounce; } b.el.style.left = b.x + 'px'; b.el.style.top = b.y + 'px'; if(b.life <= 0){ b.el.style.opacity = 0; b.el.remove(); bodies.splice(i,1); } } if(bodies.length){ requestAnimationFrame(step); } else { ticking = false; } } requestAnimationFrame(step); }
+
+  function chaos(x,y){ playForToken({type:'lisah'}); stutterFalafel(); const rect = playRect(); let t = 0; const maxBursts = quality.heavy ? 8 : 6; const spam = setInterval(()=>{ const rx = rand(40, rect.width-40); const ry = rand(40, rect.height-40); randomEffect(rx, ry); t++; if(t>=maxBursts){ clearInterval(spam); } }, 160); if(!prefersReduced){ play.classList.add('shake'); setTimeout(()=>play.classList.remove('shake'), 280); } else { flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 200); } haptic(); }
+
+  // Cached play rect with resize handling
+  let _rect = null; function playRect(){ return _rect || (_rect = play.getBoundingClientRect()); }
+  function invalidateRect(){ _rect = null; }
+  addEventListener('resize', invalidateRect, { passive:true });
+  addEventListener('orientationchange', invalidateRect, { passive:true });
+
+  // Always drifting background car with directional smoke
+  function startDrift(){
+    if(!showCar){ drifter.style.display='none'; return; }
+    drifter.style.display='block';
+    const rectInit = playRect();
+    let x = rectInit.width*0.25, y = rectInit.height*0.7;
+    let theta = -0.4; // heading
+    let u = 360; // forward px per s
+    let v = 0;   // lateral px per s
+    let rYaw = 0; // yaw rate
+    let last = 0;
+
+    // Bicycle model params
+    const a = 70, b = 70; // CG to axles
+    const invM = 1/1400;
+    const invIz = 1/50000;
+    const CfBase = 18000;
+    const CrBase = 12000;
+    const steerMax = 0.75;
+
+    let mu = 1.15; // friction
+    let Cf = CfBase;
+    let Cr = CrBase*0.85; // slight oversteer
+
+    // Autopilot targets for sustained drift
+    let side = randu()<0.5 ? -1 : 1;
+    let targetBeta = side*rand(0.65,1.05);
+    let targetSpeed = rand(420,560);
+    let nextSwitch = performance.now() + rand(700,1400);
+    let nextEbrake = performance.now() + rand(900,2000);
+    let ebrakeUntil = 0;
+
+    // Wind for smoke drift
+    let windX = rand(-40, 40), windY = rand(-20, 10);
+    let nextWind = performance.now() + rand(1200, 2200);
+
+    function clamp(t, lo, hi){ return t<lo?lo:(t>hi?hi:t); }
+    function norm(a){ while(a>Math.PI) a-=Math.PI*2; while(a<-Math.PI) a+=Math.PI*2; return a; }
+
+    function smoke(rearX,rearY,strong, slipAngle, ct, st){ if(prefersReduced || !showSmoke) return; const s=document.createElement('div'); s.className='smoke'; const swirl = rand(-12,12); s.style.setProperty('--r', swirl+'deg'); const dir = Math.max(0.4, Math.min(1.1, Math.abs(slipAngle)));
+      // World direction opposite the tire slip, with wind
+      const baseDx = (-st*dir*120) + windX*0.2;
+      const baseDy = ( ct*dir*120) + windY*0.2;
+      // Randomness and stronger push on ebrake or high slip
+      const scale = strong ? 1.4 : 1.0;
+      s.style.setProperty('--dx', (baseDx*scale + rand(-12,12)) + 'px');
+      s.style.setProperty('--dy', (baseDy*scale + rand(-8,14)) + 'px');
+      s.style.setProperty('--r2', (swirl + rand(-18,18))+'deg');
+      s.style.left=rearX+'px'; s.style.top=rearY+'px';
+      appendSmoke(s); requestAnimationFrame(()=>s.classList.add('out')); setTimeout(()=>s.remove(), 1100);
+    }
+
+    // Interaction with nearby pieces
+    let interactTick = 0;
+
+    function step(ts){
+      if(!last) last = ts; const dt = Math.min(0.032, (ts-last)/1000); last = ts;
+      const rect = playRect();
+
+      // Retarget drift and speed
+      if(ts>nextSwitch){ side = randu()<0.5?-1:1; targetBeta = side*rand(0.65,1.05); targetSpeed = rand(420,560); nextSwitch = ts + rand(700,1400); }
+      if(ts>nextEbrake){ ebrakeUntil = ts + rand(180,320); nextEbrake = ts + rand(900,2000); }
+      if(ts>nextWind){ windX = rand(-50, 60); windY = rand(-20, 16); nextWind = ts + rand(1200, 2200); }
+
+      // Steering control toward target slip
+      const beta = norm(Math.atan2(v,u));
+      let delta = clamp(-1.4*(beta - targetBeta) - 0.15*rYaw, -steerMax, steerMax);
+
+      // Grip model with ebrake reducing rear grip
+      if(ts < ebrakeUntil){ mu = 0.85; Cr = CrBase*0.35; } else { mu = 1.15; Cr = CrBase*0.85; }
+
+      // Slip angles
+      const af = norm(Math.atan2(v + a*rYaw, Math.max(1,u)) - delta);
+      const ar = norm(Math.atan2(v - b*rYaw, Math.max(1,u)));
+
+      // Lateral forces with saturation
+      let Fyf = -Cf * af;
+      let Fyr = -Cr * ar;
+      const FyMaxF = mu*12000, FyMaxR = mu*9000;
+      Fyf = clamp(Fyf, -FyMaxF, FyMaxF);
+      Fyr = clamp(Fyr, -FyMaxR, FyMaxR);
+
+      // Engine and brake along body x
+      const speed = Math.hypot(u,v);
+      let ax = speed < targetSpeed ? 280 : -180;
+      if(ts < ebrakeUntil) ax -= 120;
+
+      // Body dynamics
+      u += dt*(ax + rYaw*v + (-Fyf*Math.sin(delta))*invM);
+      v += dt*((Fyr + Fyf*Math.cos(delta))*invM - rYaw*u);
+      rYaw += dt*((a*Fyf*Math.cos(delta) - b*Fyr)*invIz);
+
+      // Integrate world
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      const wx = u*ct - v*st;
+      const wy = u*st + v*ct;
+      x += wx*dt; y += wy*dt; theta += rYaw*dt;
+
+      // Boundaries with reflection and spin kick
+      const m = 40;
+      if(x < m || x > rect.width - m){
+        x = clamp(x, m, rect.width - m);
+        const nx = x < rect.width*0.5 ? 1 : -1;
+        const rwx = -wx*0.6; const rwy = wy;
+        u = rwx*ct + rwy*st; v = -rwx*st + rwy*ct; rYaw += 1.0*nx;
+      }
+      if(y < m || y > rect.height - m){
+        y = clamp(y, m, rect.height - m);
+        const ny = y < rect.height*0.5 ? 1 : -1;
+        const rwx = wx; const rwy = -wy*0.6;
+        u = rwx*ct + rwy*ct*0 + rwy*st; v = -rwx*st + rwy*ct; rYaw -= 0.8*ny;
+      }
+
+      // Rear tire pos and smoke
+      const tailLen = (drifter.getBoundingClientRect().width||260)*0.46;
+      const rearX = x - ct*tailLen;
+      const rearY = y - st*tailLen;
+      if(!prefersReduced && (Math.abs(ar) > 0.35 || ts < ebrakeUntil)){
+        smoke(rearX, rearY, Math.abs(ar) > 0.6 || ts < ebrakeUntil, ar, ct, st);
+      }
+
+      // Push nearby pieces
+      if((interactTick = (interactTick+1)%2) === 0){
+        const nodes = play.querySelectorAll('.piece');
+        const N = nodes.length; const from = Math.max(0, N-60);
+        for(let i=from;i<N;i++){
+          const n = nodes[i];
+          const nx = parseFloat(n.style.left)||0; const ny = parseFloat(n.style.top)||0;
+          const dx = nx - x, dy = ny - y; const d = Math.hypot(dx,dy);
+          if(d < 110){ const push = (110 - d)*0.08; n.style.left = (nx + dx/d*push) + 'px'; n.style.top = (ny + dy/d*push) + 'px'; }
+        }
+      }
+
+      // Render sprite
+      drifter.style.transform = `translate(${x}px, ${y}px) rotate(${theta}rad)`;
+      requestAnimationFrame(step);
+    }
+
+    drifter.onload = ()=> requestAnimationFrame(step);
+    if(drifter.complete) requestAnimationFrame(step);
+  }
+
+  // Pause media when hidden
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ sfxLisah.pause(); sfxKeko.pause(); } });
+
+  // Interactions
+  startBtn.addEventListener('click', startShow, { passive:true });
+
+  play.addEventListener('pointerdown', e=>{ pressing = true; const r = playRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; spark(x,y); pressTimer = setTimeout(()=>{ chaos(x,y); }, 500); }, { passive:true });
+  play.addEventListener('pointermove', e=>{ if(!pressing) return; const now=Date.now(); if(now - lastTrail < 50) return; lastTrail = now; const r = playRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; const ch = ['ل','س','ه'][(randu()*3)|0]; const el = makePiece({type:'trail', mode:'text', text:ch}, x, y, 14); el.classList.add('pop'); appendPiece(el); setTimeout(()=>el.remove(), 700); }, { passive:true });
+  play.addEventListener('pointerup', ()=>{ pressing = false; clearTimeout(pressTimer); pressTimer = null; }, { passive:true });
+  play.addEventListener('pointercancel', ()=>{ pressing = false; clearTimeout(pressTimer); pressTimer = null; }, { passive:true });
+
+  play.addEventListener('pointerdown', e=>{ const r = playRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; randomEffect(x,y); }, { passive:true });
+
+  play.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ const r=playRect(); randomEffect(r.width/2,r.height/2); e.preventDefault(); } });
+
+  // Settings, mute, and state
+  gearBtn.addEventListener('click', ()=>{
+    const open = panel.style.display !== 'block';
+    panel.style.display = open ? 'block' : 'none';
+    gearBtn.setAttribute('aria-expanded', String(open));
+  });
+
+  densityRange.addEventListener('input', ()=>{
+    quality.density = +densityRange.value;
+    document.documentElement.style.setProperty('--density', String(quality.density));
+    storage.save({ ...storage.load(), density: quality.density, seed });
+  });
+
+  carToggle.addEventListener('change', ()=>{
+    showCar = carToggle.checked;
+    if(showCar){ startDrift(); } else { drifter.style.display='none'; }
+    storage.save({ ...storage.load(), car: showCar });
+  });
+  smokeToggle.addEventListener('change', ()=>{ showSmoke = smokeToggle.checked; storage.save({ ...storage.load(), smoke: showSmoke }); });
+  flagsToggle.addEventListener('change', ()=>{ flagsEnabled = flagsToggle.checked; storage.save({ ...storage.load(), flags: flagsEnabled }); });
+
+  muteBtn.addEventListener('click', ()=>{ const nowMuted = muteBtn.getAttribute('aria-pressed') === 'true' ? false : true; muteBtn.setAttribute('aria-pressed', String(nowMuted)); muted = nowMuted; muteBtn.textContent = muted ? '🔇' : '🔊'; if(!muted) playBoom(); storage.save({ ...storage.load(), muted }); });
+
+  // Startup
+  function startShow(){
+    wrap.style.display = 'none'; play.style.display = 'block';
+    ensureActx();
+    if(!preloadedImg){ const img = new Image(); img.src = 'lisah.png'; preloadedImg = true; }
+    startFPSWatch(); play.focus();
+
+    // restore prefs
+    if(saved.muted){ muted = true; muteBtn.setAttribute('aria-pressed', 'true'); muteBtn.textContent = '🔇'; }
+    if(saved.car === false){ showCar = false; carToggle.checked = false; }
+    if(saved.smoke === false){ showSmoke = false; smokeToggle.checked = false; }
+    if(saved.flags === false){ flagsEnabled = false; flagsToggle.checked = false; }
+
+    playBoom(); smirk.classList.add('show'); setTimeout(()=> smirk.classList.remove('show'), 700);
+    const r = playRect(); const cx = r.width/2, cy = r.height/2;
+    curtainDrop(); setTimeout(()=>randomEffect(cx, cy), 140); setTimeout(()=>emojiGeyser(), 300); setTimeout(()=>confettiColumns(), 520);
+    showToast('ضغط مطول للفوضى');
+
+    // Start car drift after scene is visible
+    startDrift();
+  }
+
+  // Persist new seed on unload for variety next session
+  addEventListener('beforeunload', ()=>{ storage.save({ ...storage.load(), seed: Math.floor(Math.random()*1e9) }); });
+})();
+</script>
 </body>
 </html>
