@@ -52,14 +52,14 @@
       color:#fff; border: 1px solid rgba(255,255,255,0.2);
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
       -webkit-tap-highlight-color:transparent;
-      backdrop-filter: blur(8px);
+      backdrop-filter: var(--blur);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       overflow: hidden;
     }
     .start:hover { box-shadow: 0 12px 40px rgba(0,0,0,.35); transform: translateY(-2px); }
     .start:active{ transform:translateY(1px) scale(0.98) }
 
-    .play{ position:fixed; inset:0; display:none; overflow:hidden; backface-visibility:hidden }
+    .play{ position:fixed; inset:0; display:none; overflow:hidden; backface-visibility:hidden; will-change: transform; }
     
     /* Main canvas for particles */
     #particleCanvas {
@@ -82,6 +82,16 @@
 
     /* Drifter Car */
     .drifter{ position:absolute; left:0; top:0; width:min(38vw, 420px); transform:translate(-1000px,-1000px) rotate(0deg); will-change:transform; pointer-events:none; user-select:none; filter: drop-shadow(0 10px 24px rgba(0,0,0,.35)); z-index:2; opacity:.95 }
+  
+    /* --- Mobile Optimizations --- */
+    .mobile .start {
+        /* Disable performance-heavy blur on mobile */
+        backdrop-filter: none;
+    }
+    .mobile .drifter {
+        /* Simplify heavy filters on mobile */
+        filter: drop-shadow(0 8px 15px rgba(0,0,0,.25));
+    }
   </style>
 </head>
 <body>
@@ -112,6 +122,12 @@
   const sfxLisah = document.getElementById('sfxLisah');
   const sfxKeko = document.getElementById('sfxKeko');
 
+  // --- iPhone/Mobile Optimization ---
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+      document.body.classList.add('mobile');
+  }
+
   // State
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let pressTimer = null; let pressing = false;
@@ -120,7 +136,10 @@
 
   // Quality profile
   const mem = navigator.deviceMemory || 4;
-  const quality = { density: mem <= 3 ? 0.6 : 0.85, heavy: mem > 3 };
+  const quality = { 
+      density: (isMobile ? 0.5 : 1) * (mem <= 3 ? 0.6 : 0.85), 
+      heavy: !isMobile && mem > 3 
+  };
 
   // Canvas and Particle System
   const ctx = particleCanvas.getContext('2d');
@@ -143,7 +162,6 @@
         };
         assets.forEach(asset => {
             const img = new Image();
-            // img.crossOrigin = "Anonymous"; // Not needed for local files
             img.src = asset.src;
             img.onload = () => {
                 this.images[asset.name] = img;
@@ -257,7 +275,7 @@
   }
 
   class ParticleSystem {
-      constructor() { this.particles = []; this.pool = []; this.maxParticles = 5000; }
+      constructor() { this.particles = []; this.pool = []; this.maxParticles = isMobile ? 2500 : 5000; }
       spawn(type, x, y, options) {
           if (this.particles.length >= this.maxParticles) return;
           if (type === 'img' && !options.image) return;
