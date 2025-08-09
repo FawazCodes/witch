@@ -135,10 +135,9 @@
   let frozenUntil = 0;
 
   // Quality profile
-  const mem = navigator.deviceMemory || 4;
   const quality = { 
-      density: (isMobile ? 0.5 : 1) * (mem <= 3 ? 0.6 : 0.85), 
-      heavy: !isMobile && mem > 3 
+      density: (isMobile ? 0.5 : 1) * ((navigator.deviceMemory || 4) <= 3 ? 0.6 : 0.85), 
+      heavy: !isMobile && (navigator.deviceMemory || 4) > 3 
   };
 
   // Canvas and Particle System
@@ -180,10 +179,11 @@
   function pickColor(){ const p=['#7c3aed','#10b981','#f59e0b','#06b6d4','#e11d48','#a3e635']; return p[(Math.random()*p.length)|0] }
   function haptic(){ if(!prefersReduced) play.classList.add('bump'); setTimeout(()=>play.classList.remove('bump'), 100); }
 
-  // Audio
+  // --- Audio Logic Restored ---
   let actx = null; function ensureActx(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
   function ping(){ if(!actx) return; const o=actx.createOscillator(); const g=actx.createGain(); o.type='triangle'; o.frequency.value=1600; g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.18, actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.12); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+0.15); }
-  function playForToken(token){ try{ if(token.type==='keko'){ sfxKeko.currentTime = 0; sfxKeko.play(); } else if(token.type==='lisah'){ sfxLisah.currentTime = 0; sfxLisah.play(); } }catch(e){/*Fail silently if audio can't play*/} }
+  function playBoom(){ try{ sfxLisah.currentTime = 0; sfxLisah.play(); }catch(e){/*Fail silently*/} }
+  function playForToken(token){ try{ if(token.type==='keko'){ sfxKeko.currentTime = 0; sfxKeko.play(); } else if(token.type==='lisah'){ sfxLisah.currentTime = 0; sfxLisah.play(); } }catch(e){/*Fail silently*/} }
   function stutterFalafel(){ try{ sfxLisah.pause(); sfxLisah.currentTime=0; sfxLisah.play(); setTimeout(()=>{ sfxLisah.pause(); sfxLisah.currentTime=.12; sfxLisah.play(); },110); }catch(e){/*Fail silently*/} }
   sfxKeko.addEventListener('ended', ()=>{ ensureActx(); ping(); });
 
@@ -448,6 +448,8 @@
     play.style.display = 'block';
     gameRunning = true;
     resizeCanvas();
+    ensureActx(); // Ensure audio context is ready
+    playBoom(); // Initial sound trigger
     particleSystem = new ParticleSystem();
     feedbackSystem = new FeedbackSystem(play);
     smirk.classList.add('show');
