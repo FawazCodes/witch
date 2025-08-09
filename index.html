@@ -136,7 +136,7 @@
 
   // Quality profile
   const quality = { 
-      density: (isMobile ? 0.5 : 1) * ((navigator.deviceMemory || 4) <= 3 ? 0.6 : 0.85), 
+      density: (isMobile ? 0.4 : 1) * ((navigator.deviceMemory || 4) <= 3 ? 0.6 : 0.85), 
       heavy: !isMobile && (navigator.deviceMemory || 4) > 3 
   };
 
@@ -179,11 +179,21 @@
   function pickColor(){ const p=['#7c3aed','#10b981','#f59e0b','#06b6d4','#e11d48','#a3e635']; return p[(Math.random()*p.length)|0] }
   function haptic(){ if(!prefersReduced) play.classList.add('bump'); setTimeout(()=>play.classList.remove('bump'), 100); }
 
-  // --- Audio Logic Restored ---
+  // --- Audio Logic Corrected ---
   let actx = null; function ensureActx(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
   function ping(){ if(!actx) return; const o=actx.createOscillator(); const g=actx.createGain(); o.type='triangle'; o.frequency.value=1600; g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.18, actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.12); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+0.15); }
   function playBoom(){ try{ sfxLisah.currentTime = 0; sfxLisah.play(); }catch(e){/*Fail silently*/} }
-  function playForToken(token){ try{ if(token.type==='keko'){ sfxKeko.currentTime = 0; sfxKeko.play(); } else if(token.type==='lisah'){ sfxLisah.currentTime = 0; sfxLisah.play(); } }catch(e){/*Fail silently*/} }
+  function playForToken(token){ 
+      try{ 
+          if(token.type === 'keko'){ 
+              sfxKeko.currentTime = 0; 
+              sfxKeko.play(); 
+          } else { // This will now handle 'lisah' and 'smirk'
+              sfxLisah.currentTime = 0; 
+              sfxLisah.play(); 
+          } 
+      } catch(e){/*Fail silently if audio can't play*/} 
+  }
   function stutterFalafel(){ try{ sfxLisah.pause(); sfxLisah.currentTime=0; sfxLisah.play(); setTimeout(()=>{ sfxLisah.pause(); sfxLisah.currentTime=.12; sfxLisah.play(); },110); }catch(e){/*Fail silently*/} }
   sfxKeko.addEventListener('ended', ()=>{ ensureActx(); ping(); });
 
@@ -300,12 +310,12 @@
   function spiralStorm(x,y, token){ const pts = Math.max(18, Math.round(30 * quality.density)); for(let i=0;i<pts;i++){ const ang = i * 0.35; const r = 4 + i*2.5; particleSystem.spawn(token.mode, x + Math.cos(ang)*r, y + Math.sin(ang)*r, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: token.mode==='img'? 26: 20, life: 1.1, updateFn: (p) => p.size *= 0.99 }); } }
   function rippleText(x,y, token){ const count = Math.max(10, Math.round(14 * quality.density)); for(let i=0;i<count;i++){ const ang = (i/count)*Math.PI*2; const rx = Math.cos(ang)*64; const ry = Math.sin(ang)*64; particleSystem.spawn(token.mode, x+rx, y+ry, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: token.mode==='img'? 26: 20, life: 0.8 }); } }
   function glitchFlash(x,y, token){ particleSystem.spawn(token.mode, x, y, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: 58, life: 0.4, updateFn: (p, dt) => { p.x += rand(-6,6); p.y += rand(-3,3); p.alpha = Math.random()>.3?1:.25; } }); }
-  function goldenLisah(x,y){ const gold = { type:'lisah', mode:'text', text:LTXT }; particleSystem.spawn(gold.mode, x, y, { text: gold.text, color: '#facc15', size: 52, life: 2.0, renderFn: (p, ctx) => { ctx.shadowColor = '#facc15'; ctx.shadowBlur = rand(4, 12); p.render(ctx); ctx.shadowBlur = 0; } }); setTimeout(()=>rainBurst(x,y,{type:'lisah', mode:'text', text:LTXT}), 360); }
+  function goldenLisah(x,y){ const gold = { type:'lisah', mode:'text', text:LTXT }; playForToken(gold); particleSystem.spawn(gold.mode, x, y, { text: gold.text, color: '#facc15', size: 52, life: 2.0, renderFn: (p, ctx) => { ctx.shadowColor = '#facc15'; ctx.shadowBlur = rand(4, 12); p.render(ctx); ctx.shadowBlur = 0; } }); setTimeout(()=>rainBurst(x,y,{type:'lisah', mode:'text', text:LTXT}), 360); }
   function smirkLens(x,y){ if(!quality.heavy) return; const big = document.createElement('div'); big.className='smirk show'; big.textContent='😏'; big.style.left=x+'px'; big.style.top=y+'px'; play.appendChild(big); setTimeout(()=>big.remove(), 560); particleSystem.forEach(p => { const d=Math.hypot(p.x-x, p.y-y); if(d<110) { p.size *= 1.25; setTimeout(() => p.size = p.initialSize, 520); } }); }
   function tornado(x,y){ if(!quality.heavy) return; particleSystem.forEach(p => { const dx = p.x-x, dy = p.y-y, d = Math.hypot(dx,dy); if(d<250){ const force = (250-d)*0.1; p.vx += -dy/d * force * 0.2; p.vy += dx/d * force * 0.2; } }); feedbackSystem.cameraShake(5, 300); }
-  function meteor(){ const rect=play.getBoundingClientRect(); const startX=rand(-40, rect.width*0.2), startY=rand(-20, rect.height*0.2); const steps = 24; flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 150); for(let i=0;i<steps;i++){ setTimeout(()=>{ const t=i/steps; const x=startX + t*(rect.width+100); const y=startY + t*(rect.height+70); const tk = (i%2)? {type:'smirk', mode:'text', text:'�'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, x, y, { text: tk.text, color: pickColor(), size: 18+i%4, life: 0.8 }); }, i*16); } }
+  function meteor(){ const rect=play.getBoundingClientRect(); const startX=rand(-40, rect.width*0.2), startY=rand(-20, rect.height*0.2); const steps = 24; flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 150); for(let i=0;i<steps;i++){ setTimeout(()=>{ const t=i/steps; const x=startX + t*(rect.width+100); const y=startY + t*(rect.height+70); const tk = (i%2)? {type:'smirk', mode:'text', text:'😏'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, x, y, { text: tk.text, color: pickColor(), size: 18+i%4, life: 0.8 }); }, i*16); } }
   function freezeFrame(){ frozenUntil = Date.now()+260; }
-  function nameRoulette(x,y){ const opts=['😏','كيكو',LTXT]; particleSystem.spawn('text', x,y, { text: '?', color: pickColor(), size: 48, life: 0.32, updateFn: (p, dt) => { p.text = opts[Math.floor(p.life*10) % opts.length]; }, onDeath: (p) => { const final = Math.random()<0.8? {type:'lisah', mode:'text', text:LTXT, flags:false} : {type:'keko', mode:'text', text:'كيكو'}; rainBurst(p.x,p.y, final); } }); }
+  function nameRoulette(x,y){ const opts=['😏','كيكو',LTXT]; particleSystem.spawn('text', x,y, { text: '?', color: pickColor(), size: 48, life: 0.32, updateFn: (p, dt) => { p.text = opts[Math.floor(p.life*10) % opts.length]; }, onDeath: (p) => { const final = Math.random()<0.8? {type:'lisah', mode:'text', text:LTXT, flags:false} : {type:'keko', mode:'text', text:'كيكو'}; playForToken(final); rainBurst(p.x,p.y, final); } }); }
   function spawnParrots(x, y, n) { const count = Math.max(6, Math.round((n || 10) * quality.density)); for (let i = 0; i < count; i++) { const angle = rand(0, Math.PI * 2); const dist = rand(0, 70); particleSystem.spawn('text', x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, { text: '🦜', size: rand(22, 32), vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2 - 2, life: 0.9, gravity: 4 }); } }
   function spawnYemenFlags(x, y) { const count = Math.max(3, Math.round(6 * quality.density)); for (let i = 0; i < count; i++) { const angle = rand(0, Math.PI * 2); const dist = rand(0, 100); particleSystem.spawn('text', x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, { text: '🇾🇪', size: rand(20, 28), vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5, life: 0.9, gravity: 2 }); } }
   function curtainDrop(){ const rect = play.getBoundingClientRect(); const rows = 3; const cols = 6; const w = rect.width/(cols+1); const h = rect.height/(rows+1); for(let r=1;r<=rows;r++){ for(let c=1;c<=cols;c++){ const tk = Math.random()<0.2 ? {type:'lisah', mode:'img', src:'lisah'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, w*c, -20, { text: tk.text, image: tk.mode === 'img' ? assetManager.images[tk.src] : null, color: pickColor(), size: 26, vx: rand(-0.5, 0.5), vy: 2, life: 4, gravity: 1.5, angularVelocity: rand(-2, 2), bounce: 0 }); } } }
@@ -314,6 +324,7 @@
 
   const effectPool = [rainBurst, bouncyFloor, spiralStorm, rippleText, glitchFlash];
   function randomEffect(x,y){
+    playForToken(token); // Play sound for the chosen token
     if (Math.random() < 0.005){ meteor(); return; }
     if (Math.random() < 0.003){ freezeFrame(); return; }
     if (Math.random() < 0.05){ nameRoulette(x,y); return; }
@@ -328,6 +339,7 @@
   }
 
   function chaos(x,y){
+    stutterFalafel();
     feedbackSystem.cameraShake(10, 400); haptic();
     const rect = play.getBoundingClientRect(); let t = 0; const maxBursts = quality.heavy ? 8 : 6;
     const spam = setInterval(()=>{
@@ -412,7 +424,7 @@
           const rightTireY = rearAxleY - rightVecY * (rearTrackWidth / 2);
 
           // Smoke intensity reduced for performance on mobile
-          const particlesToSpawn = Math.min(2, Math.floor(slipAmount * 1.25));
+          const particlesToSpawn = Math.min(2, Math.floor(slipAmount * (isMobile ? 1.0 : 2.5) ));
           for (let i = 0; i < particlesToSpawn; i++) {
               const inheritedVx = (u*ct - v*st) * 0.1;
               const inheritedVy = (u*st + v*ct) * 0.1;
@@ -479,16 +491,17 @@
     const r = play.getBoundingClientRect();
     const x = e.clientX - r.left; const y = e.clientY - r.top;
     spark(x,y);
-    randomEffect(x,y);
+    const token = chooseToken(); // Choose token once
+    playForToken(token); // Play sound for that token
+    randomEffect(x,y, token); // Pass the token to the effect
     pressTimer = setTimeout(()=> chaos(x,y), 500);
   }, { passive:true });
   play.addEventListener('pointermove', e=>{ if(!pressing) return; const now=Date.now(); if(now - lastTrail < 50) return; lastTrail = now; const r = play.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; const ch = ['ل','س','ه'][(Math.random()*3)|0]; particleSystem.spawn('text', x, y, { text: ch, color: pickColor(), size: 14, life: 0.7, gravity: 1 }); }, { passive:true });
   play.addEventListener('pointerup', ()=>{ pressing = false; clearTimeout(pressTimer); pressTimer = null; }, { passive:true });
   play.addEventListener('pointercancel', ()=>{ pressing = false; clearTimeout(pressTimer); pressTimer = null; }, { passive:true });
-  play.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ const r=play.getBoundingClientRect(); randomEffect(r.width/2,r.height/2); e.preventDefault(); } });
+  play.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ const r=play.getBoundingClientRect(); const token = chooseToken(); playForToken(token); randomEffect(r.width/2,r.height/2, token); e.preventDefault(); } });
 
 })();
 </script>
 </body>
 </html>
-�
