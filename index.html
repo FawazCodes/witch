@@ -303,7 +303,7 @@
   function goldenLisah(x,y){ const gold = { type:'lisah', mode:'text', text:LTXT }; particleSystem.spawn(gold.mode, x, y, { text: gold.text, color: '#facc15', size: 52, life: 2.0, renderFn: (p, ctx) => { ctx.shadowColor = '#facc15'; ctx.shadowBlur = rand(4, 12); p.render(ctx); ctx.shadowBlur = 0; } }); setTimeout(()=>rainBurst(x,y,{type:'lisah', mode:'text', text:LTXT}), 360); }
   function smirkLens(x,y){ if(!quality.heavy) return; const big = document.createElement('div'); big.className='smirk show'; big.textContent='😏'; big.style.left=x+'px'; big.style.top=y+'px'; play.appendChild(big); setTimeout(()=>big.remove(), 560); particleSystem.forEach(p => { const d=Math.hypot(p.x-x, p.y-y); if(d<110) { p.size *= 1.25; setTimeout(() => p.size = p.initialSize, 520); } }); }
   function tornado(x,y){ if(!quality.heavy) return; particleSystem.forEach(p => { const dx = p.x-x, dy = p.y-y, d = Math.hypot(dx,dy); if(d<250){ const force = (250-d)*0.1; p.vx += -dy/d * force * 0.2; p.vy += dx/d * force * 0.2; } }); feedbackSystem.cameraShake(5, 300); }
-  function meteor(){ const rect=play.getBoundingClientRect(); const startX=rand(-40, rect.width*0.2), startY=rand(-20, rect.height*0.2); const steps = 24; flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 150); for(let i=0;i<steps;i++){ setTimeout(()=>{ const t=i/steps; const x=startX + t*(rect.width+100); const y=startY + t*(rect.height+70); const tk = (i%2)? {type:'smirk', mode:'text', text:'😏'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, x, y, { text: tk.text, color: pickColor(), size: 18+i%4, life: 0.8 }); }, i*16); } }
+  function meteor(){ const rect=play.getBoundingClientRect(); const startX=rand(-40, rect.width*0.2), startY=rand(-20, rect.height*0.2); const steps = 24; flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 150); for(let i=0;i<steps;i++){ setTimeout(()=>{ const t=i/steps; const x=startX + t*(rect.width+100); const y=startY + t*(rect.height+70); const tk = (i%2)? {type:'smirk', mode:'text', text:'�'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, x, y, { text: tk.text, color: pickColor(), size: 18+i%4, life: 0.8 }); }, i*16); } }
   function freezeFrame(){ frozenUntil = Date.now()+260; }
   function nameRoulette(x,y){ const opts=['😏','كيكو',LTXT]; particleSystem.spawn('text', x,y, { text: '?', color: pickColor(), size: 48, life: 0.32, updateFn: (p, dt) => { p.text = opts[Math.floor(p.life*10) % opts.length]; }, onDeath: (p) => { const final = Math.random()<0.8? {type:'lisah', mode:'text', text:LTXT, flags:false} : {type:'keko', mode:'text', text:'كيكو'}; rainBurst(p.x,p.y, final); } }); }
   function spawnParrots(x, y, n) { const count = Math.max(6, Math.round((n || 10) * quality.density)); for (let i = 0; i < count; i++) { const angle = rand(0, Math.PI * 2); const dist = rand(0, 70); particleSystem.spawn('text', x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, { text: '🦜', size: rand(22, 32), vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2 - 2, life: 0.9, gravity: 4 }); } }
@@ -411,8 +411,8 @@
           const rightTireX = rearAxleX - rightVecX * (rearTrackWidth / 2);
           const rightTireY = rearAxleY - rightVecY * (rearTrackWidth / 2);
 
-          // Smoke reduced by 50% by changing slipAmount multiplier from 5 to 2.5
-          const particlesToSpawn = Math.min(3, Math.floor(slipAmount * 2.5));
+          // Smoke intensity reduced for performance on mobile
+          const particlesToSpawn = Math.min(2, Math.floor(slipAmount * 1.25));
           for (let i = 0; i < particlesToSpawn; i++) {
               const inheritedVx = (u*ct - v*st) * 0.1;
               const inheritedVy = (u*st + v*ct) * 0.1;
@@ -491,3 +491,4 @@
 </script>
 </body>
 </html>
+�
