@@ -1,13 +1,473 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Judah</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Judy</title>
+
+  <!-- Favicons -->
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="mask-icon" href="safari-pinned-tab.svg" color="#7c3aed">
+  <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+
   <style>
-    html, body { height: 100%; margin: 0; background: #fff; }
+    :root{
+      --bg:#0b0d12; --fg:#e5e7eb; --muted:#94a3b8;
+      --a:#7c3aed; --b:#10b981; --c:#f59e0b; --d:#06b6d4; --e:#e11d48; --f:#a3e635;
+      --glass: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.18);
+      --blur: blur(12px);
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f6f7fb; --fg:#0b0d12; --muted:#475569;
+        --glass: rgba(255, 255, 255, 0.4);
+        --glass-border: rgba(0, 0, 0, 0.1);
+      }
+    }
+    *{ box-sizing:border-box }
+    html,body{ margin:0; height:100% }
+    body{
+      background: radial-gradient(1200px 800px at 70% -10%, rgba(124,58,237,.16), transparent 60%),
+                  radial-gradient(1000px 600px at 10% 110%, rgba(16,185,129,.13), transparent 60%),
+                  var(--bg);
+      color:var(--fg);
+      font:16px/1.5 ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple Color Emoji, Segoe UI Emoji, sans-serif;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      touch-action:manipulation; user-select:none;
+      overflow: hidden;
+    }
+    .wrap{ height:100%; display:grid; place-items:center; padding:24px }
+    
+    /* Glassmorphic Start Button */
+    .start{
+      position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:18px 28px; font-weight:900; font-size:20px; border-radius:999px; cursor:pointer;
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(16, 185, 129, 0.85));
+      color:#fff; border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      -webkit-tap-highlight-color:transparent;
+      backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      overflow: hidden;
+    }
+    .start:hover { box-shadow: 0 12px 40px rgba(0,0,0,.35); transform: translateY(-2px); }
+    .start:active{ transform:translateY(1px) scale(0.98) }
+
+    .play{ position:fixed; inset:0; display:none; overflow:hidden; backface-visibility:hidden }
+    
+    /* Main canvas for particles */
+    #particleCanvas {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+    }
+    
+    .hud{ position:absolute; inset-inline:10px; top:10px; display:flex; justify-content:flex-end; align-items: center; gap:8px; pointer-events:none; z-index:5 }
+    
+    .flash{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.15), transparent); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:4 }
+    .flash.show{ opacity:1 }
+
+    .smirk{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(.2); font-size:110px; filter:drop-shadow(0 6px 18px rgba(0,0,0,.3)); opacity:0; z-index:3; pointer-events: none; }
+    .smirk.show{ animation:smirkIn .6s cubic-bezier(.2,.9,.2,1) forwards }
+    @keyframes smirkIn{ to{ transform:translate(-50%,-50%) scale(1); opacity:1 } }
+    
+    .bump{ animation:bump .1s ease-out 1 }
+    @keyframes bump{ from{ transform:scale(.985) } to{ transform:scale(1) } }
+
+    /* Drifter Car */
+    .drifter{ position:absolute; left:0; top:0; width:min(38vw, 420px); transform:translate(-1000px,-1000px) rotate(0deg); will-change:transform; pointer-events:none; user-select:none; filter: drop-shadow(0 10px 24px rgba(0,0,0,.35)); z-index:2; opacity:.95 }
   </style>
 </head>
 <body>
+  <div class="wrap" id="wrap">
+    <button class="start" id="startBtn" aria-label="Start">اضغط هنا</button>
+  </div>
+
+  <main class="play" id="play" aria-label="Play field" tabindex="0">
+    <canvas id="particleCanvas"></canvas>
+    <img id="drifter" class="drifter" src="drift.png" alt="Drifter Car" />
+    <div class="smirk" id="smirk" aria-hidden="true">😏</div>
+    <div class="flash" id="flash"></div>
+  </main>
+
+  <audio id="sfxLisah" src="falafel.mp3" preload="auto" playsinline></audio>
+  <audio id="sfxKeko" src="keko.mp3" preload="auto" playsinline></audio>
+
+<script>
+(()=>{
+  // DOM Elements
+  const wrap = document.getElementById('wrap');
+  const startBtn = document.getElementById('startBtn');
+  const play = document.getElementById('play');
+  const particleCanvas = document.getElementById('particleCanvas');
+  const smirk = document.getElementById('smirk');
+  const flash = document.getElementById('flash');
+  const drifter = document.getElementById('drifter');
+  const sfxLisah = document.getElementById('sfxLisah');
+  const sfxKeko = document.getElementById('sfxKeko');
+
+  // State
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let pressTimer = null; let pressing = false;
+  let lastTrail = 0; let gameRunning = false;
+  let frozenUntil = 0;
+
+  // Quality profile
+  const mem = navigator.deviceMemory || 4;
+  const quality = { density: mem <= 3 ? 0.6 : 0.85, heavy: mem > 3 };
+
+  // Canvas and Particle System
+  const ctx = particleCanvas.getContext('2d');
+  let particleSystem;
+  let feedbackSystem;
+
+  // Asset Management
+  const assetManager = {
+    images: {},
+    isLoaded: false,
+    load(assets, onComplete) {
+        let loaded = 0;
+        const total = assets.length;
+        if (total === 0) { onComplete(); return; }
+        const onAssetProcessed = () => {
+            if (++loaded === total) {
+                this.isLoaded = true;
+                onComplete();
+            }
+        };
+        assets.forEach(asset => {
+            const img = new Image();
+            // img.crossOrigin = "Anonymous"; // Not needed for local files
+            img.src = asset.src;
+            img.onload = () => {
+                this.images[asset.name] = img;
+                onAssetProcessed();
+            };
+            img.onerror = () => {
+                console.error(`Failed to load asset: ${asset.src}. This is expected if the file is not available in the environment.`);
+                onAssetProcessed();
+            };
+        });
+    }
+  };
+
+  // Utilities
+  function rand(min,max){ return Math.random()*(max-min)+min }
+  function pickColor(){ const p=['#7c3aed','#10b981','#f59e0b','#06b6d4','#e11d48','#a3e635']; return p[(Math.random()*p.length)|0] }
+  function haptic(){ if(!prefersReduced) play.classList.add('bump'); setTimeout(()=>play.classList.remove('bump'), 100); }
+
+  // Audio
+  let actx = null; function ensureActx(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+  function ping(){ if(!actx) return; const o=actx.createOscillator(); const g=actx.createGain(); o.type='triangle'; o.frequency.value=1600; g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.18, actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.12); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+0.15); }
+  function playForToken(token){ try{ if(token.type==='keko'){ sfxKeko.currentTime = 0; sfxKeko.play(); } else if(token.type==='lisah'){ sfxLisah.currentTime = 0; sfxLisah.play(); } }catch(e){/*Fail silently if audio can't play*/} }
+  function stutterFalafel(){ try{ sfxLisah.pause(); sfxLisah.currentTime=0; sfxLisah.play(); setTimeout(()=>{ sfxLisah.pause(); sfxLisah.currentTime=.12; sfxLisah.play(); },110); }catch(e){/*Fail silently*/} }
+  sfxKeko.addEventListener('ended', ()=>{ ensureActx(); ping(); });
+
+
+  // Token categories
+  const LTXT = 'لسه';
+  function chooseToken(){ const r = Math.random(); if(r < 0.20) return { type:'lisah', mode:'text', text:LTXT, flags:true }; if(r < 0.40) return { type:'lisah', mode:'img', src:'lisah', flags:false }; if(r < 0.60) return { type:'keko', mode:'text', text:'كيكو' }; if(r < 0.90) return { type:'lisah', mode:'text', text:LTXT, flags:false }; return { type:'smirk', mode:'text', text:'😏' }; }
+
+  class FeedbackSystem {
+      constructor(targetEl) { this.target = targetEl; }
+      cameraShake(intensity, duration) {
+          if (prefersReduced) return;
+          this.target.style.transition = 'transform 0.05s';
+          const start = Date.now();
+          const shake = () => {
+              const elapsed = Date.now() - start;
+              if (elapsed > duration) { this.target.style.transform = ''; return; }
+              const x = (Math.random() - 0.5) * intensity * (1 - elapsed/duration);
+              const y = (Math.random() - 0.5) * intensity * (1 - elapsed/duration);
+              this.target.style.transform = `translate(${x}px, ${y}px)`;
+              requestAnimationFrame(shake);
+          };
+          shake();
+      }
+  }
+
+  class Particle {
+      constructor() { this.dead = true; }
+      reset(type, x, y, options = {}) {
+          this.dead = false;
+          this.type = type;
+          this.x = x; this.y = y;
+          this.vx = options.vx || 0; this.vy = options.vy || 0;
+          this.life = options.life || 1;
+          this.initialLife = this.life;
+          this.text = options.text || '';
+          this.color = options.color || '#fff';
+          this.size = options.size || 24;
+          this.initialSize = this.size;
+          this.image = options.image || null;
+          this.rotation = options.rotation || 0;
+          this.angularVelocity = options.angularVelocity || 0;
+          this.gravity = options.gravity || 0;
+          this.friction = options.friction || 1;
+          this.fade = options.fade ?? true;
+          this.alpha = options.alpha || 1;
+          this.bounce = options.bounce || 0;
+          this.onFloor = false;
+          this.updateFn = options.updateFn; // Custom update logic
+          this.renderFn = options.renderFn; // Custom render logic
+      }
+      update(dt) {
+          if (this.updateFn) { this.updateFn(this, dt); }
+          this.life -= dt;
+          if (this.life <= 0) { this.dead = true; return; }
+          this.vy += this.gravity * dt;
+          this.x += this.vx * dt * 60; this.y += this.vy * dt * 60;
+          this.vx *= this.friction; this.vy *= this.friction;
+          this.rotation += this.angularVelocity * dt;
+          if (this.fade) { this.alpha = this.life / this.initialLife; }
+          if (this.bounce !== 0 && this.y > particleCanvas.height - this.size / 2) {
+              this.y = particleCanvas.height - this.size / 2;
+              this.vy *= this.bounce; this.vx *= 0.9;
+              if (Math.abs(this.vy) < 0.1) this.onFloor = true;
+          }
+      }
+      render(ctx) {
+          if (this.dead) return;
+          ctx.save();
+          ctx.globalAlpha = this.alpha;
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.rotation);
+          if (this.renderFn) { this.renderFn(this, ctx); }
+          else if (this.type === 'img' && this.image) {
+              ctx.drawImage(this.image, -this.size / 2, -this.size / 2, this.size, this.size);
+          } else if (this.type === 'text') {
+              ctx.font = `900 ${this.size}px ui-rounded, system-ui`;
+              ctx.fillStyle = this.color;
+              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              ctx.fillText(this.text, 0, 0);
+          } else if (this.type === 'shape') {
+              ctx.fillStyle = this.color;
+              ctx.beginPath();
+              ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+              ctx.fill();
+          }
+          ctx.restore();
+      }
+  }
+
+  class ParticleSystem {
+      constructor() { this.particles = []; this.pool = []; this.maxParticles = 5000; }
+      spawn(type, x, y, options) {
+          if (this.particles.length >= this.maxParticles) return;
+          if (type === 'img' && !options.image) return;
+          const p = this.pool.pop() || new Particle();
+          p.reset(type, x, y, options);
+          this.particles.push(p);
+      }
+      update(dt) {
+          for (let i = this.particles.length - 1; i >= 0; i--) {
+              const p = this.particles[i]; p.update(dt);
+              if (p.dead) { this.pool.push(this.particles.splice(i, 1)[0]); }
+          }
+      }
+      render(ctx) { this.particles.forEach(p => p.render(ctx)); }
+      forEach(callback) { this.particles.forEach(callback); }
+  }
+
+  // --- All Effects Restored & Ported to Canvas ---
+  function spark(x,y){ particleSystem.spawn('shape', x, y, { color: 'rgba(255,255,255,.8)', size: 8, life: 0.1, updateFn: (p) => p.size += 0.5 }); }
+  function rainBurst(x,y, token){ const total = Math.max(12, Math.round((22 + rand(0,10)) * quality.density)); for(let i=0; i<total; i++){ particleSystem.spawn(token.mode, x, y, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: token.mode === 'img' ? rand(36, 64) : rand(18, 36), vx: rand(-3, 3), vy: rand(-5, -1), life: rand(0.7, 1.2), gravity: 9.8, friction: 0.99, angularVelocity: rand(-5, 5), bounce: 0 }); } }
+  function bouncyFloor(x,y, token){ const total = Math.max(6, Math.round((12 + rand(0,6)) * quality.density)); for(let i=0; i<total; i++){ particleSystem.spawn(token.mode, x, y, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: token.mode === 'img' ? rand(34, 56) : rand(18, 30), vx: rand(-4, 4), vy: rand(-6, -2), life: rand(2.5, 4.0), gravity: 9.8, bounce: -0.65, fade: false }); } }
+  function spiralStorm(x,y, token){ const pts = Math.max(18, Math.round(30 * quality.density)); for(let i=0;i<pts;i++){ const ang = i * 0.35; const r = 4 + i*2.5; particleSystem.spawn(token.mode, x + Math.cos(ang)*r, y + Math.sin(ang)*r, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: token.mode==='img'? 26: 20, life: 1.1, updateFn: (p) => p.size *= 0.99 }); } }
+  function rippleText(x,y, token){ const count = Math.max(10, Math.round(14 * quality.density)); for(let i=0;i<count;i++){ const ang = (i/count)*Math.PI*2; const rx = Math.cos(ang)*64; const ry = Math.sin(ang)*64; particleSystem.spawn(token.mode, x+rx, y+ry, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: token.mode==='img'? 26: 20, life: 0.8 }); } }
+  function glitchFlash(x,y, token){ particleSystem.spawn(token.mode, x, y, { text: token.text, image: token.mode === 'img' ? assetManager.images[token.src] : null, color: pickColor(), size: 58, life: 0.4, updateFn: (p, dt) => { p.x += rand(-6,6); p.y += rand(-3,3); p.alpha = Math.random()>.3?1:.25; } }); }
+  function goldenLisah(x,y){ const gold = { type:'lisah', mode:'text', text:LTXT }; particleSystem.spawn(gold.mode, x, y, { text: gold.text, color: '#facc15', size: 52, life: 2.0, renderFn: (p, ctx) => { ctx.shadowColor = '#facc15'; ctx.shadowBlur = rand(4, 12); p.render(ctx); ctx.shadowBlur = 0; } }); setTimeout(()=>rainBurst(x,y,{type:'lisah', mode:'text', text:LTXT}), 360); }
+  function smirkLens(x,y){ if(!quality.heavy) return; const big = document.createElement('div'); big.className='smirk show'; big.textContent='😏'; big.style.left=x+'px'; big.style.top=y+'px'; play.appendChild(big); setTimeout(()=>big.remove(), 560); particleSystem.forEach(p => { const d=Math.hypot(p.x-x, p.y-y); if(d<110) { p.size *= 1.25; setTimeout(() => p.size = p.initialSize, 520); } }); }
+  function tornado(x,y){ if(!quality.heavy) return; particleSystem.forEach(p => { const dx = p.x-x, dy = p.y-y, d = Math.hypot(dx,dy); if(d<250){ const force = (250-d)*0.1; p.vx += -dy/d * force * 0.2; p.vy += dx/d * force * 0.2; } }); feedbackSystem.cameraShake(5, 300); }
+  function meteor(){ const rect=play.getBoundingClientRect(); const startX=rand(-40, rect.width*0.2), startY=rand(-20, rect.height*0.2); const steps = 24; flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 150); for(let i=0;i<steps;i++){ setTimeout(()=>{ const t=i/steps; const x=startX + t*(rect.width+100); const y=startY + t*(rect.height+70); const tk = (i%2)? {type:'smirk', mode:'text', text:'😏'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, x, y, { text: tk.text, color: pickColor(), size: 18+i%4, life: 0.8 }); }, i*16); } }
+  function freezeFrame(){ frozenUntil = Date.now()+260; }
+  function nameRoulette(x,y){ const opts=['😏','كيكو',LTXT]; particleSystem.spawn('text', x,y, { text: '?', color: pickColor(), size: 48, life: 0.32, updateFn: (p, dt) => { p.text = opts[Math.floor(p.life*10) % opts.length]; }, onDeath: (p) => { const final = Math.random()<0.8? {type:'lisah', mode:'text', text:LTXT, flags:false} : {type:'keko', mode:'text', text:'كيكو'}; rainBurst(p.x,p.y, final); } }); }
+  function spawnParrots(x, y, n) { const count = Math.max(6, Math.round((n || 10) * quality.density)); for (let i = 0; i < count; i++) { const angle = rand(0, Math.PI * 2); const dist = rand(0, 70); particleSystem.spawn('text', x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, { text: '🦜', size: rand(22, 32), vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2 - 2, life: 0.9, gravity: 4 }); } }
+  function spawnYemenFlags(x, y) { const count = Math.max(3, Math.round(6 * quality.density)); for (let i = 0; i < count; i++) { const angle = rand(0, Math.PI * 2); const dist = rand(0, 100); particleSystem.spawn('text', x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, { text: '🇾🇪', size: rand(20, 28), vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5, life: 0.9, gravity: 2 }); } }
+  function curtainDrop(){ const rect = play.getBoundingClientRect(); const rows = 3; const cols = 6; const w = rect.width/(cols+1); const h = rect.height/(rows+1); for(let r=1;r<=rows;r++){ for(let c=1;c<=cols;c++){ const tk = Math.random()<0.2 ? {type:'lisah', mode:'img', src:'lisah'} : {type:'lisah', mode:'text', text:LTXT}; particleSystem.spawn(tk.mode, w*c, -20, { text: tk.text, image: tk.mode === 'img' ? assetManager.images[tk.src] : null, color: pickColor(), size: 26, vx: rand(-0.5, 0.5), vy: 2, life: 4, gravity: 1.5, angularVelocity: rand(-2, 2), bounce: 0 }); } } }
+  function emojiGeyser(){ const rect = play.getBoundingClientRect(); bouncyFloor(rect.width/2, rect.height-30, {type:'smirk', mode:'text', text:'😏'}); }
+  function confettiColumns(){ const rect = play.getBoundingClientRect(); const cols = 4; const gap = rect.width/(cols+1); for(let c=1;c<=cols;c++){ rainBurst(gap*c, 20, {type:'lisah', mode:'text', text:LTXT}); } }
+
+  const effectPool = [rainBurst, bouncyFloor, spiralStorm, rippleText, glitchFlash];
+  function randomEffect(x,y){
+    if (Math.random() < 0.005){ meteor(); return; }
+    if (Math.random() < 0.003){ freezeFrame(); return; }
+    if (Math.random() < 0.05){ nameRoulette(x,y); return; }
+    const token = chooseToken();
+    if(token.type==='lisah' && token.mode==='text' && !token.flags && Math.random()<0.06){ goldenLisah(x,y); return; }
+    const fx = effectPool[(Math.random()*effectPool.length)|0];
+    fx(x,y, token);
+    if(token.type==='keko') spawnParrots(x,y);
+    if(token.type==='lisah' && token.flags) spawnYemenFlags(x,y);
+    if(quality.heavy && Math.random()<0.1) smirkLens(x,y);
+    if(quality.heavy && Math.random()<0.05) tornado(x,y);
+  }
+
+  function chaos(x,y){
+    feedbackSystem.cameraShake(10, 400); haptic();
+    const rect = play.getBoundingClientRect(); let t = 0; const maxBursts = quality.heavy ? 8 : 6;
+    const spam = setInterval(()=>{
+        randomEffect(rand(40, rect.width-40), rand(40, rect.height-40));
+        if (++t >= maxBursts) clearInterval(spam);
+    }, 160);
+  }
+
+  // --- Realistic Smoke ---
+  function spawnRealisticSmoke(x, y, inheritedVx, inheritedVy) {
+      particleSystem.spawn('custom', x, y, {
+          life: rand(1.5, 2.8),
+          friction: 0.96,
+          gravity: -0.15,
+          vx: inheritedVx + rand(-1.5, 1.5),
+          vy: inheritedVy + rand(-1.5, 1.5),
+          initialSize: rand(8, 20),
+          updateFn: (p, dt) => {
+              p.size *= 1.025; // Grow exponentially
+              p.alpha = (p.life / p.initialLife) * 0.4; // Fade out
+          },
+          renderFn: (p, ctx) => {
+              // Draw a more complex, billowy shape with multiple layers
+              ctx.fillStyle = `rgba(235, 235, 235, ${p.alpha * 0.6})`;
+              ctx.beginPath();
+              ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+              ctx.fill();
+              
+              ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha * 0.4})`;
+              ctx.beginPath();
+              ctx.arc(p.size * 0.4, p.size * 0.2, p.size * 0.75, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = `rgba(220, 220, 220, ${p.alpha * 0.5})`;
+              ctx.beginPath();
+              ctx.arc(p.size * -0.3, p.size * -0.1, p.size * 0.8, 0, Math.PI * 2);
+              ctx.fill();
+          }
+      });
+  }
+
+  // Drifter Physics
+  const drifterState = { x: 0, y: 0, theta: -0.4, u: 360, v: 0, rYaw: 0 };
+  function updateDrifter(dt, ts) {
+      if (!drifter.complete) return;
+      const rect = play.getBoundingClientRect();
+      let { x, y, theta, u, v, rYaw } = drifterState;
+      const a = 70, b = 70, invM = 1/1400, invIz = 1/50000, CfBase = 18000, CrBase = 12000, steerMax = 0.75;
+      let mu = 1.15, Cr = CrBase*0.85;
+      const beta = Math.atan2(v,u);
+      let delta = Math.max(-steerMax, Math.min(steerMax, -1.4*(beta - 0.8) - 0.15*rYaw)); // Simplified AI
+      const af = Math.atan2(v + a*rYaw, u) - delta;
+      const ar = Math.atan2(v - b*rYaw, u);
+      let Fyf = -CfBase * af; let Fyr = -Cr * ar;
+      const FyMaxF = mu*12000, FyMaxR = mu*9000;
+      Fyf = Math.max(-FyMaxF, Math.min(FyMaxF, Fyf)); Fyr = Math.max(-FyMaxR, Math.min(FyMaxR, Fyr));
+      const speed = Math.hypot(u,v);
+      let ax = speed < 450 ? 280 : -180;
+      u += dt*(ax + rYaw*v + (-Fyf*Math.sin(delta))*invM);
+      v += dt*((Fyr + Fyf*Math.cos(delta))*invM - rYaw*u);
+      rYaw += dt*((a*Fyf*Math.cos(delta) - b*Fyr)*invIz);
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      x += (u*ct - v*st)*dt; y += (u*st + v*ct)*dt; theta += rYaw*dt;
+      const m = 40;
+      if(x<m||x>rect.width-m){ x=Math.max(m,Math.min(x,rect.width-m)); const nx=x<rect.width*0.5?1:-1; const rwx=-(u*ct-v*st)*0.6, rwy=u*st+v*ct; u=rwx*ct+rwy*st; v=-rwx*st+rwy*ct; rYaw+=1.0*nx; }
+      if(y<m||y>rect.height-m){ y=Math.max(m,Math.min(y,rect.height-m)); const ny=y<rect.height*0.5?1:-1; const rwx=u*ct-v*st, rwy=-(u*st+v*ct)*0.6; u=rwx*ct+rwy*st; v=-rwx*st+rwy*ct; rYaw-=0.8*ny; }
+      Object.assign(drifterState, { x, y, theta, u, v, rYaw });
+      drifter.style.transform = `translate(${x - drifter.width / 2}px, ${y - drifter.height / 2}px) rotate(${theta}rad)`;
+      
+      // --- UPDATED SMOKE LOGIC ---
+      const slipAmount = Math.abs(ar);
+      if (!prefersReduced && slipAmount > 0.3) {
+          const rearAxleOffset = 55;
+          const rearTrackWidth = 90;
+          const rearAxleX = x - ct * rearAxleOffset;
+          const rearAxleY = y - st * rearAxleOffset;
+          const rightVecX = st;
+          const rightVecY = -ct;
+          const leftTireX = rearAxleX + rightVecX * (rearTrackWidth / 2);
+          const leftTireY = rearAxleY + rightVecY * (rearTrackWidth / 2);
+          const rightTireX = rearAxleX - rightVecX * (rearTrackWidth / 2);
+          const rightTireY = rearAxleY - rightVecY * (rearTrackWidth / 2);
+
+          // Smoke reduced by 50% by changing slipAmount multiplier from 5 to 2.5
+          const particlesToSpawn = Math.min(3, Math.floor(slipAmount * 2.5));
+          for (let i = 0; i < particlesToSpawn; i++) {
+              const inheritedVx = (u*ct - v*st) * 0.1;
+              const inheritedVy = (u*st + v*ct) * 0.1;
+              spawnRealisticSmoke(leftTireX, leftTireY, inheritedVx, inheritedVy);
+              spawnRealisticSmoke(rightTireX, rightTireY, inheritedVx, inheritedVy);
+          }
+      }
+  }
+
+  // Main Game Loop
+  let lastTime = 0;
+  function gameLoop(timestamp) {
+      if (!gameRunning) return;
+      requestAnimationFrame(gameLoop);
+      const dt = Math.min(0.032, (timestamp - lastTime) / 1000);
+      lastTime = timestamp;
+      if (Date.now() > frozenUntil) {
+          particleSystem.update(dt);
+          updateDrifter(dt, timestamp);
+      }
+      ctx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+      particleSystem.render(ctx);
+  }
+
+  function resizeCanvas() {
+      const rect = play.getBoundingClientRect();
+      particleCanvas.width = rect.width;
+      particleCanvas.height = rect.height;
+  }
+
+  function startShow(){
+    wrap.style.display = 'none';
+    play.style.display = 'block';
+    gameRunning = true;
+    resizeCanvas();
+    particleSystem = new ParticleSystem();
+    feedbackSystem = new FeedbackSystem(play);
+    smirk.classList.add('show');
+    setTimeout(()=> smirk.classList.remove('show'), 700);
+    curtainDrop();
+    setTimeout(()=>emojiGeyser(), 300);
+    setTimeout(()=>confettiColumns(), 520);
+    lastTime = performance.now();
+    gameLoop(lastTime);
+    drifterState.x = particleCanvas.width * 0.25;
+    drifterState.y = particleCanvas.height * 0.7;
+  }
+
+  // Event Listeners
+  startBtn.addEventListener('click', () => {
+      startBtn.textContent = 'جاري التحميل...';
+      assetManager.load([
+          { name: 'lisah', src: 'lisah.png' },
+          { name: 'drifter', src: 'drift.png' }
+      ], startShow);
+  }, { passive:true });
+
+  window.addEventListener('resize', resizeCanvas);
+  play.addEventListener('pointerdown', e=>{
+    if (e.target.closest('.chip')) return;
+    pressing = true;
+    const r = play.getBoundingClientRect();
+    const x = e.clientX - r.left; const y = e.clientY - r.top;
+    spark(x,y);
+    randomEffect(x,y);
+    pressTimer = setTimeout(()=> chaos(x,y), 500);
+  }, { passive:true });
+  play.addEventListener('pointermove', e=>{ if(!pressing) return; const now=Date.now(); if(now - lastTrail < 50) return; lastTrail = now; const r = play.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; const ch = ['ل','س','ه'][(Math.random()*3)|0]; particleSystem.spawn('text', x, y, { text: ch, color: pickColor(), size: 14, life: 0.7, gravity: 1 }); }, { passive:true });
+  play.addEventListener('pointerup', ()=>{ pressing = false; clearTimeout(pressTimer); pressTimer = null; }, { passive:true });
+  play.addEventListener('pointercancel', ()=>{ pressing = false; clearTimeout(pressTimer); pressTimer = null; }, { passive:true });
+  play.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ const r=play.getBoundingClientRect(); randomEffect(r.width/2,r.height/2); e.preventDefault(); } });
+
+})();
+</script>
 </body>
 </html>
